@@ -1,61 +1,72 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="afro">
+<html lang="en" data-theme="afrovibe">
 <head>
   <%- include('partials/head.ejs', { pageTitle: 'Chat' }) %>
 </head>
 
-<body class="bg-base-100 min-h-screen"
+<body class="bg-base-100 min-h-screen flex flex-col"
       data-peer-id="<%= (peer && peer._id) ? String(peer._id) : (otherUser && otherUser._id) ? String(otherUser._id) : '' %>">
 
   <%- include('partials/navbar.ejs', { currentUser, unreadMessages, unreadNotificationCount }) %>
 
   <!-- Hidden IDs for JS (force clean 24-hex strings) -->
-<input type="hidden" id="currentUserId"
-       value="<%= currentUser && currentUser._id ? String(currentUser._id) : '' %>">
-<input type="hidden" id="otherUserId"
-       value="<%= (peer && peer._id) ? String(peer._id) :
-                 (otherUser && otherUser._id) ? String(otherUser._id) : '' %>">
+  <input type="hidden" id="currentUserId"
+         value="<%= (currentUser && currentUser._id) ? String(currentUser._id) : '' %>">
 
+  <input type="hidden" id="otherUserId"
+         value="<%= (peer && peer._id) ? String(peer._id)
+                : (otherUser && otherUser._id) ? String(otherUser._id)
+                : '' %>">
 
-  <main class="max-w-4xl mx-auto p-4">
+  <main class="flex-1 max-w-4xl mx-auto p-4 w-full">
     <!-- Header -->
     <div class="card bg-base-100 border shadow mb-3">
-  <div class="flex items-center justify-between px-4 py-3">
-    <div class="flex items-center gap-3">
-      <%
-  const p0 = peer?.profile?.photos?.[0] ? String(peer.profile.photos[0]).trim() : '';
-  const avatarSrc = p0 ? (p0.startsWith('/') ? p0 : '/' + p0) : '/images/default-avatar.png';
-%>
+      <div class="flex items-center justify-between px-4 py-3">
+        <div class="flex items-center gap-3">
+          <%
+            const p0 = peer?.profile?.photos?.[0] ? String(peer.profile.photos[0]).trim() : '';
+            const avatarSrc = p0 ? (p0.startsWith('/') ? p0 : '/' + p0) : '/images/default-avatar.png';
+          %>
 
-      <!-- Fixed-size circular avatar wrapper -->
-      <div class="rounded-full overflow-hidden ring ring-base-300 ring-offset-2"
-           style="width:48px;height:48px">
-        <img src="<%= avatarSrc %>"
-             alt="avatar"
-             class="w-full h-full object-cover select-none"
-             draggable="false">
-      </div>
+          <!-- Fixed-size circular avatar wrapper -->
+          <div class="rounded-full overflow-hidden ring ring-base-300 ring-offset-2"
+               style="width:48px;height:48px">
+            <img src="<%= avatarSrc %>"
+                 alt="avatar"
+                 class="w-full h-full object-cover select-none"
+                 draggable="false">
+          </div>
 
-      <div>
-        <div class="font-semibold text-base leading-tight">
-          <%= (peer && peer.username) ? peer.username : (otherUser && otherUser.username) || 'User' %>
+          <div>
+            <div class="font-semibold text-base leading-tight">
+              <%= (peer && peer.username) ? peer.username : (otherUser && otherUser.username) || 'User' %>
+            </div>
+            <div id="typingDot" class="text-xs opacity-60 leading-tight">&nbsp;</div>
+          </div>
         </div>
-        <div id="typingDot" class="text-xs opacity-60 leading-tight">&nbsp;</div>
+
+        <div class="flex items-center gap-2">
+  <button class="btn btn-sm btn-ghost video-call-btn"
+          data-peer-id="<%= String((peer && peer._id) || (otherUser && otherUser._id) || '') %>">
+    📹 Video chat
+  </button>
+
+  <!-- New: End call (hidden until in-call) -->
+  <button type="button"
+          class="btn btn-sm btn-outline hidden video-end-btn">
+    ⛔ End
+  </button>
+
+  <!-- Clear chat (fix keeps as-is; wired by JS) -->
+  <button id="clearThreadBtn"
+          class="btn btn-sm btn-outline"
+          data-other-id="<%= (peer && peer._id) ? String(peer._id) : (otherUser && otherUser._id) ? String(otherUser._id) : '' %>">
+    🗑 Clear
+  </button>
+</div>
+
       </div>
     </div>
-
-    <div class="flex items-center gap-2">
-      <button class="btn btn-sm btn-ghost video-call-btn"
-              data-peer-id="<%=
-                (peer && peer._id) ? String(peer._id) :
-                (otherUser && otherUser._id) ? String(otherUser._id) : ''
-              %>"
-              title="Video chat">
-        📹 Video chat
-      </button>
-    </div>
-  </div>
-</div>
 
     <!-- Messages list -->
     <%
@@ -141,15 +152,17 @@
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
   </dialog>
-<!-- Socket.IO (served by Express at /socket.io/socket.io.js) -->
-<script src="/socket.io/socket.io.js" nonce="<%= cspNonce %>" defer></script>
 
-<!-- Singleton socket helper (must live in public/js/socket-helper.js) -->
-<script src="/js/socket-helper.js" nonce="<%= cspNonce %>" defer></script>
+  <!-- 1) Socket.IO client (the correct, built-in path) -->
+<script src="/socket.io/socket.io.js" defer></script>
 
-<!-- Page logic -->
-<script src="/js/page-chat.js?v=4" nonce="<%= cspNonce %>" defer></script>
+<!-- 2) Your singleton helper (make sure the filename matches) -->
+<script src="/js/socket.helper.js" defer></script>
 
-  
+<!-- 3) The page logic that uses the socket -->
+<script src="/js/page-chat.js?v=6" defer></script>
+
+
+  <%- include('partials/footer.ejs') %>
 </body>
 </html>

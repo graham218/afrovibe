@@ -1,70 +1,76 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="afro">
+<html lang="en" data-theme="afrovibe">
 <head>
   <%- include('partials/head.ejs', { pageTitle: 'Messages' }) %>
 </head>
-<body class="bg-base-100 min-h-screen">
+<body class="bg-base-100 min-h-screen flex flex-col">
   <%- include('partials/navbar.ejs', { currentUser, unreadMessages, unreadNotificationCount }) %>
 
   <!-- Hidden IDs for JS -->
   <input type="hidden" id="currentUserId" value="<%= currentUser?._id %>">
 
-  <main class="max-w-6xl mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+  <main class="flex-1 max-w-6xl mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
     <!-- Threads (left) -->
     <aside class="md:col-span-1">
       <div class="flex items-center justify-between mb-2">
-        <h1 class="text-xl font-bold">Messages</h1>
+        <h1 class="text-xl font-semibold">Messages</h1>
         <div class="flex items-center gap-2">
-          <button id="enterManage" class="btn btn-ghost btn-xs">Manage</button>
-          <button id="cancelManage" class="btn btn-ghost btn-xs hidden">Cancel</button>
+          <button id="enterManage"   class="btn btn-ghost btn-xs">Manage</button>
+          <button id="cancelManage"  class="btn btn-ghost btn-xs hidden">Cancel</button>
           <button id="deleteThreads" class="btn btn-error btn-xs hidden">Delete</button>
         </div>
       </div>
 
-      <ul id="threadList" class="menu bg-base-100 rounded-xl border">
-  <% (matches || []).forEach(u => { 
-       const p0 = u?.profile?.photos?.[0] || '/images/default-avatar.png';
-  %>
-    <!-- give the LI the thread id for easy selection -->
-    <li class="border-b last:border-0" data-user-id="<%= u._id %>">
-      <!-- normal link when NOT managing -->
-      <a href="/chat/<%= u._id %>" class="rowLink flex items-center gap-3 py-3 px-3">
-        <div class="avatar">
-          <div class="w-10 h-10 rounded-full ring ring-base-300 ring-offset-2 overflow-hidden">
-            <img src="<%= p0.startsWith('/') ? p0 : ('/' + p0) %>" alt="avatar" class="object-cover w-full h-full"/>
-          </div>
-        </div>
-        <div class="min-w-0">
-          <div class="truncate font-medium"><%= u.username %></div>
-          <div class="text-xs opacity-70">
-            <% if (u.lastMessage) { %>
-              <%= (String(u.lastMessage?.sender?._id) === String(currentUser._id) ? 'You: ' : (u.username + ': ')) %>
-              <%= (u.lastMessage?.content || '').slice(0, 48) %>
-            <% } else { %>
-              No messages yet
-            <% } %>
-          </div>
-        </div>
+      <ul id="threadList" class="menu bg-base-100 rounded-xl border border-base-300/70 overflow-hidden">
+        <% (matches || []).forEach(u => { 
+             const p0 = u?.profile?.photos?.[0] || '/images/default-avatar.png';
+        %>
+          <li class="border-b last:border-0" data-user-id="<%= u._id %>">
+            <!-- Normal link when NOT in manage mode -->
+            <a href="/chat/<%= u._id %>" class="rowLink flex items-center gap-3 py-3 px-3">
+              <div class="avatar">
+                <div class="w-10 h-10 rounded-full ring ring-base-300 ring-offset-2 overflow-hidden">
+                  <img src="<%= p0.startsWith('/') ? p0 : ('/' + p0) %>" alt="avatar" class="object-cover w-full h-full"/>
+                </div>
+              </div>
+              <div class="min-w-0">
+                <div class="truncate font-medium"><%= u.username %></div>
+                <div class="text-xs opacity-70">
+                  <% if (u.lastMessage) { %>
+                    <%= (String(u.lastMessage?.sender?._id) === String(currentUser._id) ? 'You: ' : (u.username + ': ')) %>
+                    <%= (u.lastMessage?.content || '').slice(0, 48) %>
+                  <% } else { %>
+                    No messages yet
+                  <% } %>
+                </div>
+              </div>
 
-        <span class="ml-auto badge badge-sm hidden" data-unread-for="<%= u._id %>">0</span>
+              <!-- Unread pill (updated by sockets) -->
+              <span class="ml-auto badge badge-sm hidden" data-unread-for="<%= u._id %>">0</span>
 
-        <!-- the checkbox is shown in Manage mode; clicking anywhere toggles it -->
-        <input type="checkbox"
-               class="checkbox checkbox-xs threadChk hidden ml-2"
-               data-user-id="<%= u._id %>"
-               aria-label="Select conversation" />
-      </a>
-    </li>
-  <% }) %>
-  <% if (!matches || matches.length === 0) { %>
-    <li class="p-4 text-center text-sm opacity-70">No matches yet. Start liking to create matches!</li>
-  <% } %>
-</ul>
+              <!-- Checkbox only visible in Manage mode; clicking the row toggles it -->
+              <input type="checkbox"
+                     class="checkbox checkbox-xs threadChk hidden ml-2"
+                     data-user-id="<%= u._id %>"
+                     aria-label="Select conversation for deletion" />
+            </a>
+          </li>
+        <% }) %>
+
+        <% if (!matches || matches.length === 0) { %>
+          <li class="p-4 text-center text-sm opacity-70">No matches yet. Start liking to create matches!</li>
+        <% } %>
+      </ul>
+
+      <!-- Small tip under list when in Manage mode (handled by page-messages.js) -->
+      <p id="manageTip" class="text-[12px] opacity-60 mt-2 hidden">
+        Select conversations to delete. This hides the thread for you.
+      </p>
     </aside>
 
-    <!-- Right column: simple hero panel (no embedded chat) -->
+    <!-- Right column: empty state panel -->
     <section class="md:col-span-2">
-      <div class="card bg-base-100 border shadow p-8 h-full flex items-center justify-center">
+      <div class="card bg-base-100 border border-base-300/70 shadow-sm p-8 h-full flex items-center justify-center rounded-2xl">
         <div class="text-center space-y-2">
           <div class="text-2xl font-semibold">Select a conversation</div>
           <div class="opacity-70">Click any match on the left to open the chat thread.</div>
@@ -73,9 +79,12 @@
     </section>
   </main>
 
-  <!-- Sockets + page JS -->
+  <%- include('partials/modals.ejs') %>
+  <%- include('partials/footer.ejs') %>
+
+  <!-- JS -->
   <script src="/socket.io/socket.io.js" nonce="<%= typeof cspNonce !== 'undefined' ? cspNonce : '' %>" defer></script>
-  <script src="/js/socket-helper.js" nonce="<%= typeof cspNonce !== 'undefined' ? cspNonce : '' %>" defer></script>
-  <script src="/js/page-messages.js?v=4" nonce="<%= typeof cspNonce !== 'undefined' ? cspNonce : '' %>" defer></script>
+  <script src="/js/socket-helper.js"      nonce="<%= typeof cspNonce !== 'undefined' ? cspNonce : '' %>" defer></script>
+  <script src="/js/page-messages.js?v=4"  nonce="<%= typeof cspNonce !== 'undefined' ? cspNonce : '' %>" defer></script>
 </body>
 </html>

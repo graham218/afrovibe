@@ -17,7 +17,8 @@ const bodyParser = require('body-parser'); // moved up so the webhook can use it
 
 const app = express();
 const server = http.createServer(app);
-const io = socketio(server);
+const { Server } = require('socket.io');
+const io = new Server(server);
 app.set('io', io);
 app.use((req, _res, next) => { req.io = io; next(); });
 const PORT = process.env.PORT || 3000;
@@ -612,6 +613,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/js',     express.static(path.join(__dirname, 'public/js')));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 app.use('/css',    express.static(path.join(__dirname, 'public/css')));
+app.use('/chat/uploads', express.static(path.join(__dirname, 'uploads', 'chat')));
 // Sessions after trust proxy, before routes
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret',
@@ -674,7 +676,7 @@ io.use((socket, next) => {
 
 function canVideoChat(user) {
   // Example policy: Elite OR Premium with profile.videoChat enabled
-  return isElite(user) || (isPremiumOrBetter(user) && user.videoChat === true);
+  return isElite(user);
 }
 
 // ----- Socket.IO RTC gate (one-time on connect) -----
@@ -1330,6 +1332,73 @@ app.get('/users/:id', checkAuth, async (req, res) => {
   } catch (err) {
     console.error('Error loading profile:', err);
     res.status(500).send('Server Error');
+  }
+});
+
+// GET /api/discover?limit=32&cursor=<lastId>&onlineNow=1&verifiedOnly=1&hasPhoto=1&minPhotos=3&q=...
+app.get('/api/discover', checkAuth, async (req, res) => {
+  try {
+    const meId  = String(req.session.userId || '');
+    const limit = Math.min(parseInt(req.query.limit || '32', 10), 60);
+    const cursor = (req.query.cursor || '').trim();
+
+    const q = { _id: { $ne: meId } }; // never include self
+
+    // Cursor (older than last batch)
+    if (cursor && mongoose.Types.ObjectId.isValid(cursor)) {
+      q._id = { ...(q._id || {}), $lt: new mongoose.Types.ObjectId(cursor) };
+    }
+
+    // --- Filters (map what you already collect in the dialog) ---
+    if (req.query.onlineNow === '1') q.isOnline = true;
+
+    if (req.query.verifiedOnly === '1') q.verifiedAt = { $exists: true, $ne: null };
+
+    // Has photo / min photos
+    if (req.query.hasPhoto === '1') q['profile.photos.0'] = { $exists: true };
+    if (['2','3','4'].includes(String(req.query.minPhotos))) {
+      // e.g. minPhotos=3 => require indexes 0..2 exist
+      const n = parseInt(req.query.minPhotos, 10);
+      for (let i = 0; i < n; i++) q[`profile.photos.${i}`] = { $exists: true };
+    }
+
+    // Age range
+    const minAge = parseInt(req.query.minAge || '', 10);
+    const maxAge = parseInt(req.query.maxAge || '', 10);
+    if (!Number.isNaN(minAge) || !Number.isNaN(maxAge)) {
+      q['profile.age'] = {};
+      if (!Number.isNaN(minAge)) q['profile.age'].$gte = minAge;
+      if (!Number.isNaN(maxAge)) q['profile.age'].$lte = maxAge;
+    }
+
+    // Location text filters
+    if (req.query.country)       q['profile.country']       = new RegExp(String(req.query.country).trim(), 'i');
+    if (req.query.stateProvince) q['profile.stateProvince'] = new RegExp(String(req.query.stateProvince).trim(), 'i');
+    if (req.query.city)          q['profile.city']          = new RegExp(String(req.query.city).trim(), 'i');
+
+    // Free-text ‘q’ against username/bio (simple)
+    if (req.query.q) {
+      const rx = new RegExp(String(req.query.q).trim(), 'i');
+      q.$or = [{ username: rx }, { 'profile.bio': rx }];
+    }
+
+    // NOTE: add your own blocks/exclusions here (blocked users, hidden, etc.)
+    // e.g. q._id = { $nin: blockedIds, $ne: meId, ...(cursor part) }
+
+    const items = await User.find(q)
+      .select('_id username memberLevel verifiedAt isOnline boostActive profile.photos profile.age profile.city profile.stateProvince profile.country')
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .lean();
+
+    const hasMore = items.length > limit;
+    const slice   = hasMore ? items.slice(0, limit) : items;
+    const next    = hasMore ? String(slice[slice.length - 1]._id) : null;
+
+    res.json({ ok: true, items: slice, next });
+  } catch (err) {
+    console.error('discover err', err);
+    res.status(500).json({ ok: false, items: [], next: null });
   }
 });
 
@@ -2887,19 +2956,6 @@ async function superLikeHandler(req, res) {
 app.post('/superlike/:id', checkAuth, validateObjectId('id'), validate, superLikeHandler);
 app.post('/api/superlike/:id', checkAuth, validateObjectId('id'), validate, superLikeHandler);
 
-
-// Add the new middleware to the dashboard and like routes
-app.use(resetDailyLikes);
-
-// put this once, above routes (safe to keep even if defined elsewhere)
-if (typeof global.computeBoostActive !== 'function') {
-  global.computeBoostActive = function computeBoostActive(u, nowMs = Date.now()) {
-    if (!u || !u.boostExpiresAt) return false;
-    const t = new Date(u.boostExpiresAt).getTime();
-    return Number.isFinite(t) && t > nowMs;
-  };
-}
-
 // ---- GET - Dashboard (merged + advanced filters + member level) ----
 app.get('/dashboard', checkAuth, async (req, res) => {
   try {
@@ -2980,19 +3036,18 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       return { filters: out, locks };
     }
 
-    // ⬇️⬇️⬇️  **CHANGED ORDER**: clamp filters FIRST so `filters` exists before we read filters.sort below
+    // Clamp by plan first, then by your plan-based rules
     const { filters: f1, locks: l1 } = clampFiltersForFree(rawFilters, !!currentUser.isPremium);
     const { filters, locks: l2 }     = clampFiltersByPlan(f1, currentUser);
     const premiumLocks               = { ...l1, ...l2 };
-    // ⬆️⬆️⬆️
 
-    // ---- Paging ----
+    // ---- Paging (page-based SSR) ----
     const page  = Math.max(toInt(req.query.page, 1), 1);
-    const limit = Math.min(Math.max(toInt(req.query.limit, 24), 1), 48);
+    const limit = Math.min(Math.max(toInt(req.query.limit || req.query.pageSize, 24), 6), 48); // accepts pageSize alias
     const skip  = (page - 1) * limit;
 
     // ---- Sorting (boost first, then chosen order) ----
-    const sortKey = filters.sort || 'active';   // ✅ now safe: filters is defined
+    const sortKey = filters.sort || 'active';
     let sortBase = { lastActive: -1, _id: -1 };
     if (sortKey === 'recent')   sortBase = { createdAt: -1, _id: -1 };
     if (sortKey === 'ageAsc')   sortBase = { 'profile.age': 1,  _id: -1 };
@@ -3060,26 +3115,26 @@ app.get('/dashboard', checkAuth, async (req, res) => {
 
     // ---- Projection ----
     const projection = {
-      username             : 1,
-      lastActive           : 1,
-      createdAt            : 1,
-      boostExpiresAt       : 1,
-      verifiedAt           : 1,
-      isPremium            : 1,
-      stripePriceId        : 1,
-      subscriptionPriceId  : 1,
-      'profile.age'        : 1,
-      'profile.bio'        : 1,
-      'profile.photos'     : 1,
+      username               : 1,
+      lastActive             : 1,
+      createdAt              : 1,
+      boostExpiresAt         : 1,
+      verifiedAt             : 1,
+      isPremium              : 1,
+      stripePriceId          : 1,
+      subscriptionPriceId    : 1,
+      'profile.age'          : 1,
+      'profile.bio'          : 1,
+      'profile.photos'       : 1,
       'profile.country'      : 1,
       'profile.stateProvince': 1,
       'profile.city'         : 1,
-      'profile.prompts'    : 1,
-      'profile.lat'        : 1,
-      'profile.lng'        : 1,
-      'profile.languages'  : 1,
-      'profile.religion'   : 1,
-      'profile.denomination': 1,
+      'profile.prompts'      : 1,
+      'profile.lat'          : 1,
+      'profile.lng'          : 1,
+      'profile.languages'    : 1,
+      'profile.religion'     : 1,
+      'profile.denomination' : 1,
     };
 
     // ---- Fetch + count ----
@@ -3100,15 +3155,15 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       const distanceKm =
         typeof meLat === 'number' && typeof meLng === 'number' &&
         typeof u?.profile?.lat === 'number' && typeof u?.profile?.lng === 'number'
-          ? haversineKm(meLat, meLng, u.profile.lat, u.profile.lng)   // <-- ensure this helper exists
+          ? haversineKm(meLat, meLng, u.profile.lat, u.profile.lng)
           : null;
 
       return {
         ...u,
         isOnline,
         distanceKm,
-        boostActive: computeBoostActive(u, now),                      // <-- ensure this helper exists
-        memberLevel: tierOf(u), // free | silver | emerald (used by EJS crowns)
+        boostActive: computeBoostActive(u, now),
+        memberLevel: tierOf(u), // free | silver | emerald
       };
     };
 
@@ -3134,8 +3189,8 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       const idStr = String(u._id);
       return {
         ...u,
-        isFavorite: favoriteSet.has(idStr),
-        iWaved:     wavedSet.has(idStr),
+        isFavorite : favoriteSet.has(idStr),
+        iWaved     : wavedSet.has(idStr),
         iSuperLiked: superLikedSet.has(idStr),
       };
     });
@@ -3185,6 +3240,18 @@ app.get('/dashboard', checkAuth, async (req, res) => {
     const streak = { day: Number(currentUser.streakDay || 0), target: 7, percentage: 0 };
     streak.percentage = Math.max(0, Math.min(100, (streak.day / streak.target) * 100));
 
+    // ---- Page meta (with hasPrev / hasNext for EJS) ----
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+    const pageMeta = {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasPrev: page > 1,
+      hasNext: page < totalPages,
+      sort: sortKey,
+    };
+
     // ---- Render ----
     return res.render('dashboard', {
       currentUser,
@@ -3193,15 +3260,9 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       likesRemaining,
       unreadNotificationCount: unreadNotificationCount || 0,
       unreadMessages: unreadMessages || 0,
-      filters,              // clamped filters (sticky)
+      filters,              // clamped filters (sticky in UI + used for Prev/Next URLs)
       premiumLocks,         // which controls were locked
-      pageMeta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.max(Math.ceil(total / limit), 1),
-        sort: sortKey,
-      },
+      pageMeta,
       streak,
     });
   } catch (err) {
@@ -3213,30 +3274,16 @@ app.get('/dashboard', checkAuth, async (req, res) => {
   }
 });
 
+// Add the new middleware to the dashboard and like routes
+app.use(resetDailyLikes);
 
-const DAILY_LIKE_LIMIT = Number(process.env.DAILY_LIKE_LIMIT) || 10;
-
-async function applyDailyLike(reqUserId, likedNow) {
-  const user = await User.findById(reqUserId);
-  if (!user) return;
-
-  const todayKey = new Date().toDateString();
-  const lastKey = user.lastLikeDate ? new Date(user.lastLikeDate).toDateString() : null;
-  if (todayKey !== lastKey) {
-    user.likesToday = 0;
-    user.lastLikeDate = new Date();
-  }
-  if (likedNow) user.likesToday = (user.likesToday || 0) + 1;
-
-  const GOAL = 5; // example target to advance streak
-  if (user.likesToday >= GOAL) {
-    const lastStreakKey = user.lastStreakDayKey;
-    if (lastStreakKey !== todayKey) {
-      user.streakDay = (user.streakDay || 0) + 1;
-      user.lastStreakDayKey = todayKey;
-    }
-  }
-  await user.save();
+// put this once, above routes (safe to keep even if defined elsewhere)
+if (typeof global.computeBoostActive !== 'function') {
+  global.computeBoostActive = function computeBoostActive(u, nowMs = Date.now()) {
+    if (!u || !u.boostExpiresAt) return false;
+    const t = new Date(u.boostExpiresAt).getTime();
+    return Number.isFinite(t) && t > nowMs;
+  };
 }
 
 // simple in-memory cooldown (per process)
@@ -4463,6 +4510,78 @@ app.post('/api/messages/bulk', checkAuth, async (req, res) => {
   } catch (err) {
     console.error('/api/messages/bulk err', err);
     return res.status(500).json({ ok: false });
+  }
+});
+
+// Clear / Hide an entire thread FOR ME (soft delete via deletedFor)
+app.delete('/api/messages/:otherUserId', checkAuth, async (req, res) => {
+  try {
+    const me    = new ObjectId(req.session.userId);
+    const other = new ObjectId(req.params.otherUserId);
+
+    // Only messages in this thread that are visible to me
+    const visibility = {
+      $or: [
+        { sender: me,    recipient: other },
+        { sender: other, recipient: me   },
+      ],
+      deletedFor: { $nin: [me] },
+    };
+
+    // Soft-delete them for me
+    const result = await Message.updateMany(
+      visibility,
+      { $addToSet: { deletedFor: me } }
+    );
+
+    // Update my unread badge
+    const unread = await Message.countDocuments({
+      recipient: me,
+      read: false,
+      deletedFor: { $nin: [me] }
+    });
+
+    const ioRef = req.io || req.app?.get?.('io') || null;
+    ioRef?.to(me.toString()).emit('unread_update', { unread });
+
+    return res.json({ ok: true, cleared: result.modifiedCount || 0 });
+  } catch (e) {
+    console.error('clear thread err', e);
+    return res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
+// POST /api/messages/:otherUserId/clear
+app.post('/api/messages/:otherUserId/clear', checkAuth, async (req, res) => {
+  try {
+    const me    = new ObjectId(req.session.userId);
+    const other = new ObjectId(req.params.otherUserId);
+
+    // Soft delete: add my id to deletedFor for this thread in BOTH directions
+    const threadQ = {
+      $or: [
+        { sender: me,    recipient: other },
+        { sender: other, recipient: me    }
+      ],
+      deletedFor: { $nin: [me] } // only where I'm not already in the array
+    };
+
+    const result = await Message.updateMany(threadQ, { $addToSet: { deletedFor: me } });
+
+    // Recompute my unread count (exclude my soft-deleted)
+    const unread = await Message.countDocuments({
+      recipient: me,
+      read: false,
+      deletedFor: { $nin: [me] }
+    });
+
+    const ioRef = req.io || req.app?.get?.('io') || null;
+    ioRef?.to(me.toString()).emit('unread_update', { unread });
+
+    return res.json({ ok: true, cleared: result.modifiedCount || 0 });
+  } catch (e) {
+    console.error('clear thread err', e);
+    return res.status(500).json({ ok: false, message: 'Failed to clear chat' });
   }
 });
 
