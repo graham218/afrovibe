@@ -153,14 +153,10 @@
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
   </dialog>
 
-  <!-- 1) Socket.IO client (the correct, built-in path) -->
-<script src="/socket.io/socket.io.js" defer></script>
-
-<!-- 2) Your singleton helper (make sure the filename matches) -->
-<script src="/js/socket.helper.js" defer></script>
-
-<!-- 3) The page logic that uses the socket -->
-<script src="/js/page-chat.js?v=6" defer></script>
+<!-- load from the same origin the page was served from -->
+<script nonce="<%= cspNonce %>" src="/js/socket.helper.js" defer></script>
+<script nonce="<%= cspNonce %>" src="/js/global.js" defer></script>
+<script nonce="<%= cspNonce %>" src="/js/page-chat.js" defer></script>
 
 
   <%- include('partials/footer.ejs') %>

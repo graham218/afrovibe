@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="afrovibe">
-  <%- include('partials/head.ejs', { pageTitle: user.username + " Profile" }) %>
-  <body data-theme="cupcake" class="bg-base-100 min-h-screen flex flex-col">
+  <%- include('partials/head.ejs', { pageTitle: (user?.username ? user.username + " Profile" : "Profile") }) %>
+  <body class="bg-base-100 min-h-screen flex flex-col">
     <%- include('partials/navbar.ejs') %>
 
     <div class="container mx-auto p-4 flex-grow">
+      <main class="max-w-6xl mx-auto p-4 md:p-6 w-full flex-1"
+      data-viewed-id="<%= String(user._id) %>">
 
-      <!-- Unified Success Flash (supports successMessage or success) -->
-      <% const _success = (typeof successMessage !== 'undefined' && successMessage) ? successMessage : ((typeof success !== 'undefined' && success) ? success : null); %>
+      <!-- Unified Success Flash -->
+      <% const _success = (typeof successMessage !== 'undefined' && successMessage) ? successMessage
+                    : ((typeof success !== 'undefined' && success) ? success : null); %>
       <% if (_success) { %>
         <div class="alert alert-success shadow-lg max-w-2xl mx-auto my-6">
           <div>
@@ -37,111 +40,133 @@
 
           <!-- Header: Avatar + Basic Info -->
           <div class="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
+
             <!-- Profile Picture -->
             <div class="relative w-48 h-48 md:w-64 md:h-64 rounded-full overflow-hidden shadow-lg border-4 border-primary">
-              <% if (user.profile && user.profile.photos && user.profile.photos.length > 0) { %>
-                <img src="<%= user.profile.photos[0] %>" alt="<%= user.username %>" class="w-full h-full object-cover">
+              <% const _photos = (user?.profile?.photos && user.profile.photos.length) ? user.profile.photos : []; %>
+              <% if (_photos.length) { %>
+                <img src="<%= _photos[0] %>" alt="<%= user.username %>" class="w-full h-full object-cover select-none">
               <% } else { %>
-                <div class="w-full h-full bg-base-300 flex items-center justify-center text-gray-500">
-                  <span>No Photo</span>
-                </div>
+                <img src="/images/default-avatar.png" alt="No photo" class="w-full h-full object-cover select-none">
               <% } %>
             </div>
 
             <!-- Profile Info -->
-            <div class="flex-grow text-center md:text-left">
-              <h1 class="text-4xl font-extrabold text-primary">
-                <%= user.username %>
-                <% if (user.profile && user.profile.age) { %>
-                  , <span class="text-gray-600 font-normal"><%= user.profile.age %></span>
+            <div class="flex-grow text-center md:text-left w-full">
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <h1 class="text-4xl font-extrabold text-primary truncate">
+                  <%= user.username %>
+                  <% if (user?.profile?.age) { %>
+                    <span class="text-gray-600 font-normal">, <%= user.profile.age %></span>
+                  <% } %>
+                </h1>
+
+                <!-- Single normalized membership badge -->
+                <%
+                  const _plan = (user?.plan && user.plan !== 'free') ? String(user.plan).toLowerCase()
+                               : (user?.isPremium ? 'premium' : 'free');
+                %>
+                <% if (_plan === 'elite') { %>
+                  <span class="badge badge-secondary badge-lg">Elite ✨</span>
+                <% } else if (_plan === 'premium') { %>
+                  <span class="badge badge-success badge-lg">Premium ✅</span>
+                <% } else { %>
+                  <span class="badge badge-ghost badge-lg">Free</span>
                 <% } %>
-              </h1>
+              </div>
 
-              <!-- Premium / Free Tier label FOR THE VIEWED PROFILE -->
-              <% if (user.isPremium) { %>
-                <p class="text-green-600 font-bold text-lg">Premium Member ✅</p>
-              <% } else { %>
-                <p class="text-gray-600 font-medium">Free Tier User</p>
-              <% } %>
-
-              <!-- AFTER (normalized) -->
-<% const viewedPlan = planOf(user); %>
-<% if (viewedPlan === 'elite') { %>
-  <p class="text-purple-600 font-bold text-lg">Elite Member ✨</p>
-<% } else if (viewedPlan === 'premium') { %>
-  <p class="text-green-600 font-bold text-lg">Premium Member ✅</p>
-<% } else { %>
-  <p class="text-gray-600 font-medium">Free Tier User</p>
-<% } %>     
-
-              <% if (user.profile && user.profile.location) { %>
-                <p class="text-xl text-gray-500"><%= user.profile.location %></p>
+              <%
+                const locStr = (user?.profile?.location)
+                  ? user.profile.location
+                  : [user?.profile?.city, user?.profile?.country].filter(Boolean).join(', ');
+              %>
+              <% if (locStr) { %>
+                <p class="text-xl text-base-content/70 mt-1"><%= locStr %></p>
               <% } %>
 
               <!-- Action Buttons -->
-              <div class="flex justify-center md:justify-start gap-4 mt-6">
-                <!-- Message Button -->
-                <a href="/chat/<%= user._id %>" class="btn btn-secondary btn-lg">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                  </svg>
-                  Message
-                </a>
+              <div class="flex flex-wrap justify-center md:justify-start gap-4 mt-6">
+  <a href="/chat/<%= user._id %>" class="btn btn-secondary">Message</a>
 
-                <!-- Like Button -->
-                <button class="btn btn-primary btn-lg like-btn" data-user-id="<%= user._id %>">
-                  ❤️ Like
-                </button>
+  <!-- Like / Super-like / Wave / Favorite -->
+  <button id="btnLike" class="btn btn-primary" title="<%= hasLiked ? 'Unlike' : 'Like' %>">
+    <svg id="iconLike" viewBox="0 0 24 24" class="h-5 w-5 <%= hasLiked ? 'text-rose-600' : 'text-base-content/70' %>">
+      <path d="M12 21s-7.2-4.35-10-8.4C-.11 9.64 1.64 6 5 6c1.9 0 3.1.93 4 2 0 0 1.8-2 4-2 3.36 0 5.11 3.64 3 6.6C19.2 16.65 12 21 12 21z" fill="currentColor"/>
+    </svg>
+    <span class="hidden sm:inline"><%= hasLiked ? 'Liked' : 'Like' %></span>
+  </button>
 
-                <!-- Dislike Button -->
-                <button class="btn btn-ghost btn-circle btn-lg dislike-btn" data-user-id="<%= user._id %>">
-                  ❌
-                </button>
-              </div>
+  <button id="btnSuperlike" class="btn btn-outline btn-sm">⚡ <span class="hidden sm:inline">Super-like</span></button>
+  <button id="btnWave"       class="btn btn-outline btn-sm">👋 <span class="hidden sm:inline">Wave</span></button>
+  <button id="btnFavorite"   class="btn btn-outline btn-sm">⭐ <span class="hidden sm:inline">Favorite</span></button>
 
-              <!-- Report / Block Buttons -->
-              <div class="mt-4 flex justify-center md:justify-start gap-4">
-                <!-- Report Button (modal) -->
-                <button class="btn btn-warning btn-outline btn-sm" onclick="document.getElementById('reportModal').showModal()">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.398 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  Report
-                </button>
+  <!-- Request video call (the script handles gating/errors) -->
+  <button id="btnCall" class="btn btn-ghost btn-sm">📹 Call</button>
 
-                <!-- Block Button (modal) -->
-                <button class="btn btn-error btn-outline btn-sm" onclick="document.getElementById('blockModal').showModal()">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                  </svg>
-                  Block
-                </button>
-              </div>
+  <!-- Report / Block -->
+  <button id="btnReport" class="btn btn-warning btn-outline btn-sm">Report</button>
+  <button id="btnBlock"  class="btn btn-error btn-outline btn-sm">Block</button>
+</div>
+
             </div>
           </div>
 
           <!-- About / Details -->
-          <div class="mt-6 text-gray-700">
+          <div class="mt-6 text-base-content">
             <h3 class="text-2xl font-bold mb-2">About Me</h3>
-            <p class="text-md mb-4"><%= (user.profile && user.profile.bio) ? user.profile.bio : 'No bio provided.' %></p>
+            <p class="text-md mb-4"><%= (user?.profile?.bio) ? user.profile.bio : 'No bio provided.' %></p>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <p><strong>Gender:</strong> <%= (user.profile && user.profile.gender) ? user.profile.gender : 'N/A' %></p>
-                <p><strong>Age:</strong> <%= (user.profile && user.profile.age) ? user.profile.age : 'N/A' %></p>
-                <p><strong>Lives in:</strong> <%= (user.profile && user.profile.location) ? user.profile.location : 'N/A' %></p>
-                <p><strong>Marital Status:</strong> <%= (user.profile && user.profile.maritalStatus) ? user.profile.maritalStatus : 'N/A' %></p>
-                <p><strong>Height:</strong> <%= (user.profile && user.profile.height) ? (user.profile.height + ' cm') : 'N/A' %></p>
+            <!-- Chips for Interests -->
+            <% const _interests = Array.isArray(user?.profile?.interests) ? user.profile.interests.slice(0,12) : []; %>
+            <% if (_interests.length) { %>
+              <div class="flex flex-wrap gap-2 mb-4">
+                <% _interests.forEach(function(tag){ %>
+                  <span class="badge badge-outline"><%= tag %></span>
+                <% }) %>
               </div>
-              <div>
-                <p><strong>Body style:</strong> <%= (user.profile && user.profile.bodyStyle) ? user.profile.bodyStyle : 'N/A' %></p>
-                <p><strong>Ethnicity:</strong> <%= (user.profile && user.profile.ethnicity) ? user.profile.ethnicity : 'N/A' %></p>
-                <p><strong>Occupation:</strong> <%= (user.profile && user.profile.occupation) ? user.profile.occupation : 'N/A' %></p>
-                <p><strong>Religion:</strong> <%= (user.profile && user.profile.religion) ? user.profile.religion : 'N/A' %></p>
-                <p><strong>Languages:</strong> <%= (user.profile && user.profile.languages) ? user.profile.languages : 'N/A' %></p>
+            <% } %>
+
+            <!-- Basics (expanded to match edit-profile/my-profile fields) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div class="space-y-1">
+                <p><span class="opacity-70">Gender:</span> <%= user?.profile?.gender || '—' %></p>
+                <p><span class="opacity-70">Age:</span> <%= user?.profile?.age || '—' %></p>
+                <p><span class="opacity-70">Lives in:</span> <%= locStr || '—' %></p>
+                <p><span class="opacity-70">Occupation:</span> <%= user?.profile?.occupation || '—' %></p>
+                <p><span class="opacity-70">Education:</span> <%= user?.profile?.educationLevel || '—' %></p>
+                <p><span class="opacity-70">Languages:</span> <%= (user?.profile?.languagesSpoken || user?.profile?.languages || []).join(', ') || '—' %></p>
+              </div>
+              <div class="space-y-1">
+                <p><span class="opacity-70">Religion:</span> <%= user?.profile?.religion || '—' %></p>
+                <p><span class="opacity-70">Smoking:</span> <%= user?.profile?.smokes || '—' %></p>
+                <p><span class="opacity-70">Drinking:</span> <%= user?.profile?.drinks || '—' %></p>
+                <p><span class="opacity-70">Pets:</span> <%= (user?.profile?.pets||[]).join(', ') || '—' %></p>
+                <!-- Newly mirrored fields -->
+                <p><span class="opacity-70">Body art:</span> <%= (user?.profile?.bodyArt||[]).join(', ') || '—' %></p>
+                <p><span class="opacity-70">Looking for:</span> <%= (user?.profile?.relationshipLookingFor||[]).join(', ') || '—' %></p>
+                <p><span class="opacity-70">Children:</span> <%= user?.profile?.children || '—' %></p>
+                <p><span class="opacity-70">Wants more children:</span> <%= user?.profile?.wantsMoreChildren || '—' %></p>
+              </div>
+              <div class="md:col-span-2">
+                <p><span class="opacity-70">Hobbies & Interests:</span>
+                  <%= (user?.profile?.hobbiesInterests||[]).join(', ') || '—' %>
+                </p>
+              </div>
+            </div>
+
+            <!-- Highlights (prompts) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+              <div class="rounded-xl bg-base-100 border p-4">
+                <div class="text-xs opacity-70 mb-1">Favorite African artists</div>
+                <div><%= user?.favoriteAfricanArtists || '—' %></div>
+              </div>
+              <div class="rounded-xl bg-base-100 border p-4">
+                <div class="text-xs opacity-70 mb-1">Cultural traditions</div>
+                <div><%= user?.culturalTraditions || '—' %></div>
+              </div>
+              <div class="rounded-xl bg-base-100 border p-4 md:col-span-2">
+                <div class="text-xs opacity-70 mb-1">Relationship goals</div>
+                <div><%= user?.relationshipGoals || '—' %></div>
               </div>
             </div>
           </div>
@@ -149,12 +174,12 @@
           <!-- Photos -->
           <div class="divider">Photos</div>
           <div class="photo-gallery grid grid-cols-2 md:grid-cols-3 gap-4">
-            <% if (user.profile && user.profile.photos && user.profile.photos.length > 0) { %>
-              <% user.profile.photos.forEach(function(photo){ %>
-                <img src="<%= photo %>" alt="Photo of <%= user.username %>" class="w-full h-48 object-cover rounded-xl shadow">
+            <% if (_photos.length) { %>
+              <% _photos.forEach(function(photo){ %>
+                <img src="<%= photo %>" alt="Photo of <%= user.username %>" class="w-full h-48 object-cover rounded-xl shadow select-none">
               <% }); %>
             <% } else { %>
-              <div class="photo-placeholder col-span-full text-center text-gray-500 italic">
+              <div class="photo-placeholder col-span-full text-center text-base-content/60 italic">
                 <span>No photos available</span>
               </div>
             <% } %>
@@ -164,20 +189,22 @@
       <% } %> <!-- /if not blocked -->
     </div> <!-- /container -->
 
-    <!-- Modals -->
+    <!-- Block Modal -->
     <dialog id="blockModal" class="modal">
       <div class="modal-box">
         <h3 class="font-bold text-lg">Confirm Block</h3>
-        <p class="py-4">Are you sure you want to block this user? They will be permanently removed from your matches and dashboard.</p>
+        <p class="py-4">Are you sure you want to block this user? They will be removed from your visibility.</p>
         <div class="modal-action">
           <form id="blockForm" action="/block/<%= user._id %>" method="POST">
             <button type="submit" class="btn btn-error">Block</button>
           </form>
-          <button class="btn btn-ghost" onclick="document.getElementById('blockModal').close()">Cancel</button>
+          <button type="button" class="btn btn-ghost" id="blockCancelBtn">Cancel</button>
         </div>
       </div>
+      <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
 
+    <!-- Report Modal -->
     <dialog id="reportModal" class="modal">
       <div class="modal-box">
         <h2 class="font-bold text-lg">Report User</h2>
@@ -186,34 +213,61 @@
           <textarea name="reason" class="textarea textarea-bordered w-full" placeholder="Reason for reporting" required></textarea>
           <div class="modal-action">
             <button type="submit" class="btn btn-primary">Submit Report</button>
-            <button type="button" class="btn btn-ghost" onclick="document.getElementById('reportModal').close()">Cancel</button>
+            <button type="button" class="btn btn-ghost" id="reportCancelBtn">Cancel</button>
           </div>
         </form>
       </div>
+      <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
+    <dialog id="reportDialog" class="modal">
+  <div class="modal-box">
+    <form id="reportForm" method="dialog">
+      <h3 class="font-semibold mb-2">Report <%= user.username %></h3>
+      <p class="text-sm opacity-70 mb-3">Tell us what happened. Our team will review.</p>
+
+      <label class="form-control">
+        <span class="label-text">Reason</span>
+        <select name="reason" class="select select-bordered w-full" required>
+          <option value="">Select…</option>
+          <option value="spam">Spam</option>
+          <option value="fake_profile">Fake profile</option>
+          <option value="harassment">Harassment</option>
+          <option value="inappropriate_content">Inappropriate content</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label class="form-control mt-3">
+        <span class="label-text">Details</span>
+        <textarea name="details" rows="4" class="textarea textarea-bordered w-full" placeholder="Add any helpful details…"></textarea>
+      </label>
+
+      <div class="mt-4 flex items-center justify-end gap-2">
+        <button type="button" class="btn btn-ghost" id="reportCancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-error">Submit report</button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 
     <%- include('partials/modals.ejs') %>
     <%- include('partials/footer.ejs') %>
 
-    <!-- JavaScript -->
-    <script>
+    <!-- Page JS (CSP-safe) -->
+    <script nonce="<%= cspNonce || '' %>">
       document.addEventListener('DOMContentLoaded', () => {
-        // Like button
+        // Like
         document.querySelectorAll('.like-btn').forEach(button => {
           button.addEventListener('click', async (e) => {
             const userId = e.currentTarget.getAttribute('data-user-id');
             try {
               const response = await fetch(`/like/${userId}`, { method: 'POST' });
-              const result = await response.json();
+              const result = await response.json().catch(()=>({}));
               if (result.status === 'match') {
-                const matchModal = document.getElementById('matchModal');
-                const matchedUser = document.getElementById('matchedUser');
-                if (matchModal && matchedUser) {
-                  matchedUser.innerText = result.message;
-                  matchModal.showModal();
-                }
+                alert('It’s a match! 🎉'); // or open your match modal if present
               } else if (result.status === 'error') {
-                showAlertModal('Error', result.message);
+                showAlertModal('Error', result.message || 'Could not like user');
               } else {
                 showAlertModal('Success', 'User liked!');
               }
@@ -224,15 +278,15 @@
           });
         });
 
-        // Dislike button
+        // Dislike
         document.querySelectorAll('.dislike-btn').forEach(button => {
           button.addEventListener('click', async (e) => {
             const userId = e.currentTarget.getAttribute('data-user-id');
             try {
               const response = await fetch(`/dislike/${userId}`, { method: 'POST' });
-              const result = await response.json();
+              const result = await response.json().catch(()=>({}));
               if (result.status === 'error') {
-                showAlertModal('Error', result.message);
+                showAlertModal('Error', result.message || 'Could not dislike user');
               } else {
                 showAlertModal('Success', 'User disliked!');
               }
@@ -242,14 +296,36 @@
             }
           });
         });
+
+        // Report Modal open/close
+        const reportModal = document.getElementById('reportModal');
+        const btnReportOpen = document.getElementById('btnReportOpen');
+        const reportCancelBtn = document.getElementById('reportCancelBtn');
+        if (btnReportOpen && reportModal) {
+          btnReportOpen.addEventListener('click', () => { try { reportModal.showModal(); } catch {} });
+        }
+        if (reportCancelBtn && reportModal) {
+          reportCancelBtn.addEventListener('click', () => { try { reportModal.close(); } catch {} });
+        }
+
+        // Block Modal open/close
+        const blockModal = document.getElementById('blockModal');
+        const btnBlockOpen = document.getElementById('btnBlockOpen');
+        const blockCancelBtn = document.getElementById('blockCancelBtn');
+        if (btnBlockOpen && blockModal) {
+          btnBlockOpen.addEventListener('click', () => { try { blockModal.showModal(); } catch {} });
+        }
+        if (blockCancelBtn && blockModal) {
+          blockCancelBtn.addEventListener('click', () => { try { blockModal.close(); } catch {} });
+        }
       });
 
-      // Minimal modal helpers (safe if partial already defines similar helpers)
+      // Minimal modal helpers (in case your partial isn't present)
       function showAlertModal(title, message) {
         const modal = document.getElementById('alertModal');
         const alertTitle = document.getElementById('alertTitle');
         const alertMessage = document.getElementById('alertMessage');
-        if (modal && alertTitle && alertMessage) {
+        if (modal && alertTitle && alertMessage && modal.showModal) {
           alertTitle.innerText = title;
           alertMessage.innerText = message;
           modal.showModal();
@@ -258,8 +334,6 @@
         }
       }
     </script>
+    <script src="/js/profile.js" defer></script>
   </body>
 </html>
-
-
-

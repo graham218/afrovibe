@@ -74,8 +74,36 @@
 
   // (Optional) if your server blocks RTC by plan, redirect
   socket.on('connect_error', (err) => {
-    if (String(err?.message).includes('upgrade-required')) {
-      location.href = '/upgrade?reason=video';
+  const msg = String(err?.message || '');
+  // plan gating you already had:
+  if (msg.includes('upgrade-required')) {
+    location.href = '/upgrade?reason=video';
+    return;
+  }
+  // new: session/auth problem
+  if (msg.includes('unauthorized')) {
+    console.warn('[socket] unauthorized – are you logged in?');
+    // Optional UX: send to login if page requires auth
+    // location.href = '/login';
+  }
+});
+// socket.helper.js
+(function () {
+  function init() {
+    if (!window.io) {
+      console.error('[io] client library not loaded'); 
+      return;
     }
-  });
+    const socket = io({ transports: ['websocket', 'polling'] });
+    window.appSocket = socket;
+    socket.on('connect', () => console.log('[io] connected', socket.id));
+    // ... your existing bindings ...
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
 })();

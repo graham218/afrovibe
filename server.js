@@ -202,24 +202,43 @@ async function getLastMessagesByPeer({ meObj, allIds }) {
   return Object.fromEntries(rows.map(r => [String(r._id), r.last]));
 }
 
-// --- Multer Configuration for File Uploads ---
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+// Serve uploaded images at https://yourdomain.com/uploads/filename.jpg
+app.use('/uploads', express.static(uploadDir));
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = 'uploads/';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
+  destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}${path.extname(file.originalname)}`);
-  },
+    const ext  = path.extname(file.originalname || '').toLowerCase();
+    const base = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    cb(null, base + ext);
+  }
 });
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
+
+const MAX_PHOTOS = 5; // keep in sync with photos UI text
 
 const dns = require('dns');
 try { dns.setDefaultResultOrder('ipv4first'); } catch {}
 
+
+// Small helpers (pure)
+// ==========================
+function normalizeArray(v) {
+  if (v == null) return [];
+  if (Array.isArray(v)) return v.map(x => String(x).trim()).filter(Boolean);
+  return String(v).split(',').map(s => s.trim()).filter(Boolean);
+}
+function toIntOrNull(v, min, max) {
+  if (v == null || v === '') return null;
+  let n = parseInt(v, 10);
+  if (Number.isNaN(n)) return null;
+  if (typeof min === 'number') n = Math.max(min, n);
+  if (typeof max === 'number') n = Math.min(max, n);
+  return n;
+}
 
 // --- Mongoose Models ---
 const User = require('./models/User');
@@ -608,6 +627,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Serve uploads and public assets before any auth-protected routes
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/js',     express.static(path.join(__dirname, 'public/js')));
@@ -626,6 +646,26 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production'
   }
 }));
+
+// --- replace your current session(...) block with this:
+const sessionMiddleware = session({
+  secret: process.env.SESSION_SECRET || 'dev-secret',
+  resave: false,
+  saveUninitialized: false,
+  proxy: true,
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  }
+});
+
+// use for HTTP routes
+app.use(sessionMiddleware);
+
+// ALSO share it with Socket.IO
+io.engine.use(sessionMiddleware);
+
 
 
 // Middleware to attach full user to req.user
@@ -675,9 +715,16 @@ io.use((socket, next) => {
 });
 
 function canVideoChat(user) {
-  // Example policy: Elite OR Premium with profile.videoChat enabled
-  return isElite(user);
+  // allow if explicit toggle OR premium/elite sub id, tweak to your truthy fields
+  const hasToggle = !!(user?.videoChat || user?.profile?.videoChat);
+  const isPaid =
+    String(user?.subscriptionPriceId || '').toLowerCase().includes('elite') ||
+    String(user?.stripePriceId || '').toLowerCase().includes('elite') ||
+    !!user?.isPremium;
+
+  return hasToggle || isPaid;
 }
+
 
 // ----- Socket.IO RTC gate (one-time on connect) -----
 io.use(async (socket, next) => {
@@ -712,7 +759,7 @@ io.on('connection', (socket) => {
 
   // Use ONE room format everywhere: plain uid
   socket.join(socket.userId);
-
+  socket.data.userId = socket.userId;
   // ---- Chat rate-limiting state ----
   socket.data.msgCount = 0;
   socket.data.msgWindowStart = Date.now();
@@ -809,31 +856,47 @@ io.on('connection', (socket) => {
   };
 }
 
-socket.on('rtc:call',      guardRTC(({ to, meta }) => {
-  if (!to) return;
-  console.log(`[rtc] call from=${socket.userId} to=${to}`);
-  io.to(String(to)).emit('rtc:incoming', { from: socket.userId, meta: meta || {} });
+const getFrom = () => String(socket.data.userId || '');
+
+socket.on('rtc:call', guardRTC(({ to, meta }) => {
+  const from = getFrom(); if (!to || !from) return;
+  io.to(String(to)).emit('rtc:ring', { from, meta: meta || {} });
 }));
 
-socket.on('rtc:offer',     guardRTC(({ to, sdp }) => {
-  if (!to || !sdp) return;
-  io.to(String(to)).emit('rtc:offer', { from: socket.userId, sdp });
+socket.on('rtc:offer', guardRTC(({ to, sdp }) => {
+  const from = getFrom(); if (!to || !from || !sdp) return;
+  io.to(String(to)).emit('rtc:offer', { from, sdp });
 }));
 
-socket.on('rtc:answer',    guardRTC(({ to, sdp }) => {
-  if (!to || !sdp) return;
-  io.to(String(to)).emit('rtc:answer', { from: socket.userId, sdp });
+socket.on('rtc:answer', guardRTC(({ to, sdp }) => {
+  const from = getFrom(); if (!to || !from || !sdp) return;
+  io.to(String(to)).emit('rtc:answer', { from, sdp });
 }));
 
 socket.on('rtc:candidate', guardRTC(({ to, candidate }) => {
-  if (!to || !candidate) return;
-  io.to(String(to)).emit('rtc:candidate', { from: socket.userId, candidate });
+  const from = getFrom(); if (!to || !from || !candidate) return;
+  io.to(String(to)).emit('rtc:candidate', { from, candidate });
 }));
 
-socket.on('rtc:end', ({ to, reason }) => {
-  if (!to) return;
-  io.to(String(to)).emit('rtc:end', { from: socket.userId, reason: reason || 'hangup' });
-});
+socket.on('rtc:end', guardRTC(({ to, reason }) => {
+  const from = getFrom(); if (!to || !from) return;
+  io.to(String(to)).emit('rtc:end', { from, reason: reason || 'hangup' });
+}));
+
+// (Optional) support older clients that still emit 'rtc:hangup' / 'rtc:decline'
+// now protected by guardRTC, same as offer/answer/candidate/end
+socket.on('rtc:hangup', guardRTC(({ to }) => {
+  const from = String(socket.data.userId || '');
+  if (!to || !from) return;
+  io.to(String(to)).emit('rtc:end', { from, reason: 'hangup' });
+}));
+
+socket.on('rtc:decline', guardRTC(({ to }) => {
+  const from = String(socket.data.userId || '');
+  if (!to || !from) return;
+  io.to(String(to)).emit('rtc:end', { from, reason: 'declined' });
+}));
+
 
   socket.on('disconnect', () => {
     // optional cleanup/logging
@@ -901,9 +964,10 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  res.locals.cspNonce = res.locals.cspNonce || req.cspNonce; // depending on your helmet version
   next();
 });
+
 
 app.use((req, res, next) => {
   if (
@@ -915,27 +979,26 @@ app.use((req, res, next) => {
   next();
 });
 
+// Make navbar data available to all EJS views
 app.use(async (req, res, next) => {
-  res.locals.currentUser = null;
-  res.locals.unreadMessages = 0;
-  res.locals.unreadNotificationCount = 0;
-
-  if (!req.session.userId) return next();
-
   try {
-    const currentUser = await User.findById(req.session.userId).lean();
-    if (currentUser) {
-      res.locals.currentUser = currentUser;
-      // keep your real implementations:
-      res.locals.unreadMessages = await getUnreadMessagesCount(req.session.userId);
-      res.locals.unreadNotificationCount = await getUnreadNotificationCount(req.session.userId);
-    }
-  } catch (err) {
-    console.error('locals user load err:', err);
-  }
-  next();
-});
+    if (!req.session?.userId) return next();
 
+    const meId = req.session.userId;
+    const [currentUser, unreadMessages, unreadNotificationCount] = await Promise.all([
+      User.findById(meId).select('username profile.photos').lean(),
+      Message.countDocuments({ recipient: meId, read: false }),
+      Notification.countDocuments({ recipient: meId, read: false }),
+    ]);
+
+    res.locals.currentUser = currentUser || null;
+    res.locals.unreadMessages = unreadMessages || 0;
+    res.locals.unreadNotificationCount = unreadNotificationCount || 0;
+    next();
+  } catch (e) {
+    next(); // fail soft; navbar will just show defaults
+  }
+});
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -1048,6 +1111,68 @@ app.use(async (req, res, next) => {
     next(); // don't block page render if counts fail
   }
 });
+
+// ---- Daily key in UTC (stable across servers/browsers) ----
+function dayKeyUTC(d = new Date()) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const da = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${da}`;   // e.g., 2025-10-28
+}
+
+// ---- Premium check you can reuse ----
+function isPremiumOrBetter(user) {
+  return !!user?.isPremium || (user?.plan && user.plan !== 'free');
+}
+
+// ---- Session-based reveal flag for TODAY ----
+function canRevealLikesToday(req, isPremium) {
+  if (isPremium) return true;                        // premium always unblurred
+  return req.session?.likesYouRevealDay === dayKeyUTC();
+}
+function markRevealedLikesToday(req) {
+  req.session.likesYouRevealDay = dayKeyUTC();       // mark today as revealed
+}
+
+// ---- Optional middleware: grant N reveals/day (non-premium), else paywall ----
+// Also adds a verified bonus (e.g., +1 if verified) and a new-user grace window.
+function requirePremiumOrDailyReveal(limit = 1, { graceHours = 72, verifiedBonus = 1 } = {}) {
+  return async (req, res, next) => {
+    const u = await User.findById(req.session.userId);
+    if (!u) return res.redirect('/login');
+
+    if (isPremiumOrBetter(u)) return next();         // premium bypass
+
+    // Grace period for brand-new accounts
+    const createdAt = u.createdAt ? new Date(u.createdAt).getTime() : 0;
+    const graceOk = createdAt && (Date.now() - createdAt) <= graceHours * 3600 * 1000;
+    if (graceOk) return next();
+
+    // Per-day counters on the user doc (server-side canonical store)
+    const today = dayKeyUTC();
+    if (u.likesYouRevealDay !== today) {
+      u.likesYouRevealDay = today;
+      u.likesYouRevealCount = 0;
+    }
+    const allowance = limit + (u.verifiedAt ? verifiedBonus : 0);
+
+    if ((u.likesYouRevealCount || 0) < allowance) {
+      u.likesYouRevealCount = (u.likesYouRevealCount || 0) + 1;
+      await u.save();
+
+      // Mirror to session so GET /likes-you renders unblurred right away
+      req.session.likesYouRevealDay = today;
+      return next();
+    }
+
+    return res.status(402).render('paywall', {
+      feature: 'Who liked you',
+      allowance,
+      used: u.likesYouRevealCount,
+    });
+  };
+}
+
 
 // --- Routes ---
 app.get('/', (req, res) => {
@@ -1220,9 +1345,6 @@ app.post('/verify-email/confirm', checkAuth, async (req, res) => {
   }
 });
 
-// put near your static routes
-app.get('/socket.io/socket.io.js', (req, res) => res.redirect(301, '/js/socket.io.js'));
-
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // --- RTC config (STUN/TURN) ---
@@ -1245,44 +1367,13 @@ app.get('/api/rtc/config', checkAuth, (req, res) => {
   res.json({ rtc: { iceServers } });
 });
 
-// /profile route
-app.get('/profile', checkAuth, async (req, res) => {
-  try {
-    const currentUser = await User.findById(req.session.userId).lean();
-    if (!currentUser) return res.status(404).send('User not found');
-
-    const success = req.query.payment === 'success'
-      ? 'Subscription successful! You are now a Premium Member.'
-      : null;
-
-    const unreadNotificationCount = await Notification.countDocuments({
-      recipient: currentUser._id,
-      read: false,
-    });
-    const unreadMessages = await Message.countDocuments({
-      recipient: currentUser._id,
-      read: false,
-    });
-
-    // Render **my-profile.ejs** (not profile.ejs)
-    res.render('my-profile', {
-      currentUser,
-      success,
-      unreadNotificationCount,
-      unreadMessages
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Server Error');
-  }
-});
-
+app.get('/profile', (req, res) => res.redirect(301, '/my-profile'));
 
 // View another user's profile
 app.get('/users/:id', checkAuth, async (req, res) => {
   try {
-    const currentUserId = req.session.userId;
-    const profileId = req.params.id;
+    const currentUserId = String(req.session.userId || '');
+    const profileId = String(req.params.id || '');
 
     if (!mongoose.Types.ObjectId.isValid(profileId)) {
       return res.status(400).send('Invalid user ID');
@@ -1292,32 +1383,26 @@ app.get('/users/:id', checkAuth, async (req, res) => {
       User.findById(currentUserId).lean(),
       User.findById(profileId).lean(),
     ]);
+    if (!currentUser || !user) return res.status(404).send('User not found');
 
-    if (!currentUser || !user) {
-      return res.status(404).send('User not found');
-    }
+    // Normalize to string Sets to avoid ObjectId vs string mismatches
+    const set = arr => new Set((arr || []).map(v => String(v)));
+    const myLikes         = set(currentUser.likes);
+    const theirLikes      = set(user.likes);
+    const myBlocked       = set(currentUser.blockedUsers);
 
-    // Flash message from subscription redirect
-    const successMessage = req.query.payment === 'success' 
-      ? 'Subscription successful! You are now a Premium Member.' 
+    const hasLiked   = myLikes.has(profileId);
+    const isMatched  = hasLiked && theirLikes.has(currentUserId);
+    const isBlocked  = myBlocked.has(profileId);
+
+    const [unreadNotificationCount, unreadMessages] = await Promise.all([
+      Notification.countDocuments({ recipient: currentUserId, read: false }),
+      Message.countDocuments({ recipient: currentUserId, read: false }),
+    ]);
+
+    const successMessage = req.query.payment === 'success'
+      ? 'Subscription successful! You are now a Premium Member.'
       : null;
-
-    // Check like/match/block status
-    const hasLiked = currentUser.likes?.includes(profileId);
-    const hasBeenLikedBy = user.likes?.includes(currentUserId);
-    const isMatched = hasLiked && hasBeenLikedBy;
-    const isBlocked = currentUser.blockedUsers?.includes(profileId);
-
-    // Notifications + messages
-    const unreadNotificationCount = await Notification.countDocuments({
-      recipient: currentUserId,
-      read: false,
-    });
-
-    const unreadMessages = await Message.countDocuments({
-      recipient: currentUserId,
-      read: false,
-    });
 
     res.render('profile', {
       currentUser,
@@ -1327,13 +1412,14 @@ app.get('/users/:id', checkAuth, async (req, res) => {
       hasLiked,
       unreadNotificationCount: unreadNotificationCount || 0,
       unreadMessages: unreadMessages || 0,
-      successMessage // ✅ fixed name
+      successMessage,
     });
   } catch (err) {
     console.error('Error loading profile:', err);
     res.status(500).send('Server Error');
   }
 });
+
 
 // GET /api/discover?limit=32&cursor=<lastId>&onlineNow=1&verifiedOnly=1&hasPhoto=1&minPhotos=3&q=...
 app.get('/api/discover', checkAuth, async (req, res) => {
@@ -1402,117 +1488,101 @@ app.get('/api/discover', checkAuth, async (req, res) => {
   }
 });
 
-// --- GET: My Profile page ---
 app.get('/my-profile', checkAuth, async (req, res) => {
   try {
-    const user = await User.findById(req.session.userId).lean();
-    if (!user) return res.redirect('/login');
+    const meId = req.session.userId;
+    const currentUser = await User.findById(meId).lean();
+    if (!currentUser) return res.redirect('/login');
 
-    return res.render('my-profile', {
-      currentUser: user,
-      // if you redirect with ?updated=1 or ?upgrade=1 these flags will show toasts/alerts if you want
-      success: req.query.updated === '1',
-      upgradeSuccess: req.query.upgrade === '1'
+    const [unreadMessages, unreadNotificationCount] = await Promise.all([
+      Message.countDocuments({ recipient: meId, read: false }),
+      Notification.countDocuments({ recipient: meId, read: false }),
+    ]);
+
+    // Optional: unified flash name
+    const successMessage = req.query.payment === 'success'
+      ? 'Subscription successful! You are now a Premium Member.'
+      : null;
+
+    res.render('my-profile', {
+      pageTitle: 'My Profile',
+      currentUser,
+      updated: req.query.updated === '1',
+      unreadMessages,
+      unreadNotificationCount,
+      successMessage,
     });
-  } catch (e) {
-    console.error('GET /my-profile error', e);
-    return res.status(500).render('error', { status: 500, message: 'Failed to load profile.' });
+  } catch (err) {
+    console.error('GET /my-profile', err);
+    res.status(500).render('error', { status: 500, message: 'Failed to load profile.' });
   }
 });
 
-// --- POST: Save profile fields + handle up to 4 photos ---
-// The form uses multiple <input name="photos">, so use array()
-app.post('/my-profile', checkAuth, upload.array('photos', 8), vMyProfile, async (req, res) => {
+app.post('/my-profile', checkAuth, upload.array('photos', MAX_PHOTOS), async (req, res) => {
   try {
-    const user = await User.findById(req.session.userId);
-    if (!user) return res.redirect('/login');
+    const meId = req.session.userId;
+    const me = await User.findById(meId)
+      .select('profile favoriteAfricanArtists culturalTraditions relationshipGoals')
+      .lean();
+    if (!me) return res.redirect('/login');
 
-    // Normalize body fields
-    const bio   = toTrimmed(req.body.bio);
-    const age   = toInt(req.body.age);
-    const gender = toTrimmed(req.body.gender);
-    const occupation = toTrimmed(req.body.occupation);
-    const interestsStr = toTrimmed(req.body.interests);
-    const favoriteAfricanArtists = toTrimmed(req.body.favoriteAfricanArtists);
-    const culturalTraditions     = toTrimmed(req.body.culturalTraditions);
-    const relationshipGoals      = toTrimmed(req.body.relationshipGoals);
+    const bio        = (req.body.bio || '').trim();
+    const age        = toIntOrNull(req.body.age, 18, 100);
+    const gender     = (req.body.gender || '').trim();
+    const occupation = (req.body.occupation || '').trim();
+    const interests  = normalizeArray(req.body.interests);
 
-    // Ensure profile object exists
-    user.profile = user.profile || {};
+    const favoriteAfricanArtists = (req.body.favoriteAfricanArtists || '').trim();
+    const culturalTraditions     = (req.body.culturalTraditions || '').trim();
+    const relationshipGoals      = (req.body.relationshipGoals || '').trim();
 
-    if (bio) user.profile.bio = bio;
-    if (age != null) user.profile.age = age;
-    if (gender) user.profile.gender = gender;
-    if (occupation) user.profile.occupation = occupation;
+    const existing = Array.isArray(me?.profile?.photos) ? me.profile.photos : [];
+    const uploaded = (req.files || []).map(f => '/uploads/' + path.basename(f.filename));
+    const merged   = Array.from(new Set([...uploaded, ...existing])).slice(0, MAX_PHOTOS);
 
-    // Interests: comma-separated -> array of trimmed unique values
-    if (interestsStr) {
-      user.profile.interests = interestsStr
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-        .filter((v, i, a) => a.indexOf(v) === i);
-    }
+    const $set = {
+      'profile.bio': bio || null,
+      'profile.age': age,
+      'profile.gender': gender || null,
+      'profile.occupation': occupation || null,
+      'profile.interests': interests,
+      'profile.photos': merged,
+      favoriteAfricanArtists,
+      culturalTraditions,
+      relationshipGoals,
+    };
 
-    if (favoriteAfricanArtists) user.profile.favoriteAfricanArtists = favoriteAfricanArtists;
-    if (culturalTraditions)     user.profile.culturalTraditions     = culturalTraditions;
-    if (relationshipGoals)      user.profile.relationshipGoals      = relationshipGoals;
-
-    // Photos handling
-    user.profile.photos = Array.isArray(user.profile.photos) ? user.profile.photos : [];
-    const files = Array.isArray(req.files) ? req.files : [];
-
-    // For each uploaded file, push into photos (max 12 for storage; show top 4 in UI)
-    for (const f of files) {
-      // f.path like "uploads/123.jpg" -> serve at "/uploads/123.jpg"
-      const publicPath = '/' + String(f.path).replace(/\\/g, '/');
-      // Avoid duplicates
-      if (!user.profile.photos.includes(publicPath)) {
-        user.profile.photos.push(publicPath);
-      }
-    }
-    // Optional: keep only first 12 photos stored
-    if (user.profile.photos.length > 12) {
-      user.profile.photos = user.profile.photos.slice(0, 12);
-    }
-
-    await user.save();
-
-    // Redirect so the page reloads (and avoids resubmitting the form on refresh)
-    return res.redirect('/my-profile?updated=1');
-  } catch (e) {
-    console.error('POST /my-profile error', e);
-    return res.status(500).render('error', { status: 500, message: 'Failed to save profile.' });
+    await User.updateOne({ _id: meId }, { $set });
+    res.redirect('/my-profile?updated=1');
+  } catch (err) {
+    console.error('POST /my-profile', err);
+    res.status(500).render('error', { status: 500, message: 'Failed to update profile.' });
   }
 });
 
 
 app.get('/edit-profile', checkAuth, async (req, res) => {
-    try {
-        const currentUser = await User.findById(req.session.userId);
+  try {
+    const meId = req.session.userId;
+    const currentUser = await User.findById(meId).lean();
+    if (!currentUser) return res.redirect('/login');
 
-        // Fetch the count of unread notifications
-        const unreadNotificationCount = await Notification.countDocuments({ 
-            recipient: req.session.userId, 
-            read: false 
-        });
+    const [unreadMessages, unreadNotificationCount] = await Promise.all([
+      Message.countDocuments({ recipient: meId, read: false }),
+      Notification.countDocuments({ recipient: meId, read: false })
+    ]);
 
-        // Fetch the count of unread messages for the navbar
-        const unreadMessages = await Message.countDocuments({
-            recipient: req.session.userId,
-            read: false,
-        });
-
-        res.render('edit-profile', { 
-            currentUser, 
-            unreadNotificationCount, 
-            unreadMessages,
-            error: null // <-- Initialize the error variable
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Server Error');
-    }
+    res.render('edit-profile', {
+      pageTitle: 'Edit Profile',
+      currentUser,
+      unreadMessages,
+      unreadNotificationCount,
+      error: null
+    });
+  } catch (err) {
+    console.error('GET /edit-profile', err);
+    res.status(500).render('error', { status: 500, message: 'Failed to load editor.' });
+  }
 });
 
 
@@ -1522,232 +1592,196 @@ const getValidEnumValue = (value) => {
 };
 
 app.post('/edit-profile', checkAuth, async (req, res) => {
-    try {
-        const {
-            username, gender, bio, location,
-            firstName, birthMonth, birthYear, country, stateProvince, city,
-            hairColor, eyeColor, height, weight, bodyType, ethnicity,
-            appearanceRating, drinks, smokes, maritalStatus, hasChildren,
-            numberOfChildren, oldestChildAge, youngestChildAge, wantsMoreChildren,
-            occupation, employmentStatus, annualIncome, livingSituation,
-            willingToRelocate, nationality, educationLevel, englishAbility, frenchAbility,
-            religion, religiousValues, polygamy, starSign, profileHeading,
-            aboutYourself, lookingForInPartner,
-            // NEW: Hobbies & Interests
-            hobbiesInterests,
-            // NEW: Personality Questions
-            earlyBirdNightOwl, stressHandling, idealWeekend, humorImportance,
-            plannerSpontaneous, favoriteMusic, favoriteBookGenre, favoriteMovieGenre,
-            enjoyCooking, travelImportance, stayActive, pdaComfort,
-            communicationStyle, disagreementHandling, loveLanguage, introvertExtrovert,
-            familyImportance, idealDate, tryingNewThings, biggestPetPeeve
-        } = req.body;
+  try {
+    const meId = req.session.userId;
 
-        const currentUser = await User.findById(req.session.userId);
-        
-        // Handle multi-select fields (arrays)
-        const bodyArt = Array.isArray(req.body.bodyArt) ? req.body.bodyArt : (req.body.bodyArt ? [req.body.bodyArt] : []);
-        const pets = Array.isArray(req.body.pets) ? req.body.pets : (req.body.pets ? [req.body.pets] : []);
-        const relationshipLookingFor = Array.isArray(req.body.relationshipLookingFor) ? req.body.relationshipLookingFor : (req.body.relationshipLookingFor ? [req.body.relationshipLookingFor] : []);
-        const languagesSpoken = Array.isArray(req.body.languagesSpoken) ? req.body.languagesSpoken : (req.body.languagesSpoken ? [req.body.languagesSpoken] : []);
-        const parsedHobbiesInterests = Array.isArray(hobbiesInterests) ? hobbiesInterests : (hobbiesInterests ? [hobbiesInterests] : []);
+    // basics
+    const username = (req.body.username || '').toString().trim();
+    const age      = toIntOrNull(req.body.age, 18, 100);
+    const gender   = (req.body.gender || '').toString().trim();
+    const bio      = (req.body.bio || '').toString().trim();
 
-        const updateData = {
-            username: getValidEnumValue(username), // Apply helper for username too if it can be empty
-            'profile.firstName': getValidEnumValue(firstName),
-            'profile.gender': getValidEnumValue(gender),
-            'profile.bio': getValidEnumValue(bio),
-            'profile.location': getValidEnumValue(location), // This is the general location field
-            'profile.birthMonth': getValidEnumValue(birthMonth),
-            'profile.birthYear': birthYear ? parseInt(birthYear) : undefined,
-            'profile.country': getValidEnumValue(country),
-            'profile.stateProvince': getValidEnumValue(stateProvince),
-            'profile.city': getValidEnumValue(city),
-            'profile.hairColor': getValidEnumValue(hairColor),
-            'profile.eyeColor': getValidEnumValue(eyeColor),
-            'profile.height': getValidEnumValue(height),
-            'profile.weight': getValidEnumValue(weight),
-            'profile.bodyType': getValidEnumValue(bodyType),
-            'profile.ethnicity': getValidEnumValue(ethnicity),
-            'profile.bodyArt': bodyArt, // Arrays are handled differently
-            'profile.appearanceRating': getValidEnumValue(appearanceRating),
-            'profile.drinks': getValidEnumValue(drinks),
-            'profile.smokes': getValidEnumValue(smokes),
-            'profile.maritalStatus': getValidEnumValue(maritalStatus),
-            'profile.hasChildren': getValidEnumValue(hasChildren),
-            'profile.numberOfChildren': numberOfChildren ? parseInt(numberOfChildren) : undefined,
-            'profile.oldestChildAge': oldestChildAge ? parseInt(oldestChildAge) : undefined,
-            'profile.youngestChildAge': youngestChildAge ? parseInt(youngestChildAge) : undefined,
-            'profile.wantsMoreChildren': getValidEnumValue(wantsMoreChildren),
-            'profile.pets': pets, // Arrays are handled differently
-            'profile.occupation': getValidEnumValue(occupation),
-            'profile.employmentStatus': getValidEnumValue(employmentStatus),
-            'profile.annualIncome': getValidEnumValue(annualIncome),
-            'profile.livingSituation': getValidEnumValue(livingSituation),
-            'profile.willingToRelocate': getValidEnumValue(willingToRelocate),
-            'profile.relationshipLookingFor': relationshipLookingFor, // Arrays are handled differently
-            'profile.nationality': getValidEnumValue(nationality),
-            'profile.educationLevel': getValidEnumValue(educationLevel),
-            'profile.languagesSpoken': languagesSpoken, // Arrays are handled differently
-            'profile.englishAbility': getValidEnumValue(englishAbility),
-            'profile.frenchAbility': getValidEnumValue(frenchAbility),
-            'profile.religion': getValidEnumValue(religion),
-            'profile.religiousValues': getValidEnumValue(religiousValues),
-            'profile.polygamy': getValidEnumValue(polygamy),
-            'profile.starSign': getValidEnumValue(starSign),
-            'profile.profileHeading': getValidEnumValue(profileHeading),
-            'profile.aboutYourself': getValidEnumValue(aboutYourself),
-            'profile.lookingForInPartner': getValidEnumValue(lookingForInPartner),
-            // NEW: Hobbies & Interests
-            'profile.hobbiesInterests': parsedHobbiesInterests,
-            // NEW: Personality Questions
-            'profile.earlyBirdNightOwl': getValidEnumValue(earlyBirdNightOwl),
-            'profile.stressHandling': getValidEnumValue(stressHandling),
-            'profile.idealWeekend': getValidEnumValue(idealWeekend),
-            'profile.humorImportance': getValidEnumValue(humorImportance),
-            'profile.plannerSpontaneous': getValidEnumValue(plannerSpontaneous),
-            'profile.favoriteMusic': getValidEnumValue(favoriteMusic),
-            'profile.favoriteBookGenre': getValidEnumValue(favoriteBookGenre),
-            'profile.favoriteMovieGenre': getValidEnumValue(favoriteMovieGenre),
-            'profile.enjoyCooking': getValidEnumValue(enjoyCooking),
-            'profile.travelImportance': getValidEnumValue(travelImportance),
-            'profile.stayActive': getValidEnumValue(stayActive),
-            'profile.pdaComfort': getValidEnumValue(pdaComfort),
-            'profile.communicationStyle': getValidEnumValue(communicationStyle),
-            'profile.disagreementHandling': getValidEnumValue(disagreementHandling),
-            'profile.loveLanguage': getValidEnumValue(loveLanguage),
-            'profile.introvertExtrovert': getValidEnumValue(introvertExtrovert),
-            'profile.familyImportance': getValidEnumValue(familyImportance),
-            'profile.idealDate': getValidEnumValue(idealDate),
-            'profile.tryingNewThings': getValidEnumValue(tryingNewThings),
-            'profile.biggestPetPeeve': getValidEnumValue(biggestPetPeeve)
-        };
+    // location
+    const country       = (req.body.country || '').toString().trim();
+    const stateProvince = (req.body.stateProvince || '').toString().trim();
+    const city          = (req.body.city || '').toString().trim();
 
-        // Calculate age from birthYear
-        if (birthYear) {
-            updateData['profile.age'] = new Date().getFullYear() - parseInt(birthYear);
-        }
+    // work/edu
+    const occupation       = (req.body.occupation || '').toString().trim();
+    const employmentStatus = (req.body.employmentStatus || '').toString().trim();
+    const educationLevel   = (req.body.educationLevel || '').toString().trim();
 
-        // Note: Photo uploads are now handled by the /photos route
-        // This route will only save other profile data.
+    // background
+    const nationality     = (req.body.nationality || '').toString().trim();
+    const religion        = (req.body.religion || '').toString().trim();
+    const starSign        = (req.body.starSign || '').toString().trim();
+    const languagesSpoken = normalizeArray(req.body.languagesSpoken);
 
-        await User.findByIdAndUpdate(req.session.userId, updateData, { new: true, runValidators: true });
-        res.redirect('/dashboard');
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Server Error');
+    // lifestyle
+    const drinks  = (req.body.drinks || '').toString().trim();
+    const smokes  = (req.body.smokes || '').toString().trim();
+    const pets    = normalizeArray(req.body.pets);
+    const bodyArt = normalizeArray(req.body.bodyArt);
+
+    // relationship/family
+    const relationshipLookingFor = normalizeArray(req.body.relationshipLookingFor);
+    const children          = (req.body.children || '').toString().trim();
+    const wantsMoreChildren = (req.body.wantsMoreChildren || '').toString().trim();
+
+    // interests
+    const interests        = normalizeArray(req.body.interests);
+    const hobbiesInterests = normalizeArray(req.body.hobbiesInterests);
+
+    // personality (20 keys)
+    const keys = [
+      'earlyBirdNightOwl','stressHandling','idealWeekend','humorImportance','plannerSpontaneous',
+      'favoriteMusic','favoriteBookGenre','favoriteMovieGenre','enjoyCooking','travelImportance',
+      'stayActive','pdaComfort','communicationStyle','disagreementHandling','loveLanguage',
+      'introvertExtrovert','familyImportance','idealDate','tryingNewThings','biggestPetPeeve'
+    ];
+    const personality = {};
+    keys.forEach(k => personality[k] = (req.body[k] || '').toString().trim());
+
+    // prompts (top-level)
+    const favoriteAfricanArtists = (req.body.favoriteAfricanArtists || '').toString().trim();
+    const culturalTraditions     = (req.body.culturalTraditions || '').toString().trim();
+    const relationshipGoals      = (req.body.relationshipGoals || '').toString().trim();
+
+    // build update
+    const $set = {
+      username,
+      'profile.age': age,
+      'profile.gender': gender,
+      'profile.bio': bio,
+
+      'profile.country': country,
+      'profile.stateProvince': stateProvince,
+      'profile.city': city,
+
+      'profile.occupation': occupation,
+      'profile.employmentStatus': employmentStatus,
+      'profile.educationLevel': educationLevel,
+
+      'profile.nationality': nationality,
+      'profile.religion': religion,
+      'profile.starSign': starSign,
+      'profile.languagesSpoken': languagesSpoken,
+
+      'profile.drinks': drinks,
+      'profile.smokes': smokes,
+      'profile.pets': pets,
+      'profile.bodyArt': bodyArt,
+
+      'profile.relationshipLookingFor': relationshipLookingFor,
+      'profile.children': children,
+      'profile.wantsMoreChildren': wantsMoreChildren,
+
+      'profile.interests': interests,
+      'profile.hobbiesInterests': hobbiesInterests,
+
+      favoriteAfricanArtists,
+      culturalTraditions,
+      relationshipGoals
+    };
+    for (const [k, v] of Object.entries(personality)) {
+      $set[`profile.${k}`] = v;
     }
+
+    await User.updateOne({ _id: meId }, { $set }, { runValidators: true });
+    res.redirect('/my-profile?updated=1');
+  } catch (err) {
+    console.error('POST /edit-profile', err);
+    res.status(500).render('error', { status: 500, message: 'Failed to save profile.' });
+  }
 });
 
-// --- NEW PHOTO GALLERY ROUTES ---
 app.get('/photos', checkAuth, async (req, res) => {
-    try {
-        const currentUser = await User.findById(req.session.userId);
-        
-        // Fetch the count of unread notifications
-        const unreadNotificationCount = await Notification.countDocuments({
-            recipient: req.session.userId,
-            read: false
-        });
+  try {
+    const meId = req.session.userId;
+    const me = await User.findById(meId).select('profile.photos').lean();
+    const userPhotos = Array.isArray(me?.profile?.photos) ? me.profile.photos : [];
 
-        // Fetch the count of unread messages for the navbar
-        const unreadMessages = await Message.countDocuments({
-            recipient: req.session.userId,
-            read: false,
-        });
+    const [unreadMessages, unreadNotificationCount] = await Promise.all([
+      Message.countDocuments({ recipient: meId, read: false }),
+      Notification.countDocuments({ recipient: meId, read: false })
+    ]);
 
-        // Pass the user's photos to the template
-        const userPhotos = currentUser.profile.photos;
-
-        res.render('photos', {
-            currentUser,
-            unreadNotificationCount,
-            unreadMessages,
-            userPhotos // <-- Now passing this variable
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Server Error');
-    }
+    res.render('photos', {
+      pageTitle: 'Manage Photos',
+      userPhotos,
+      unreadMessages,
+      unreadNotificationCount
+    });
+  } catch (err) {
+    console.error('GET /photos', err);
+    res.status(500).render('error', { status: 500, message: 'Failed to load photos.' });
+  }
 });
 
-app.post('/photos/upload', checkAuth, upload.array('profilePhotos', 5), async (req, res) => {
-    try {
-        const currentUser = await User.findById(req.session.userId);
-        const files = req.files;
+app.post('/photos/upload', checkAuth, upload.array('profilePhotos', MAX_PHOTOS), async (req, res) => {
+  try {
+    const meId = req.session.userId;
+    const me = await User.findById(meId).select('profile.photos').lean();
+    const existing = Array.isArray(me?.profile?.photos) ? me.profile.photos : [];
 
-        if (!files || files.length === 0) {
-            return res.status(400).json({ status: 'error', message: 'No photos were uploaded.' });
-        }
+    const newOnes = (req.files || []).map(f => '/uploads/' + path.basename(f.filename));
+    const merged  = Array.from(new Set([...newOnes, ...existing])).slice(0, MAX_PHOTOS);
 
-        const photoUrls = files.map(file => `/uploads/${file.filename}`);
+    await User.updateOne({ _id: meId }, { $set: { 'profile.photos': merged } });
 
-        currentUser.profile.photos.push(...photoUrls);
-        if (currentUser.profile.photos.length > 5) {
-            currentUser.profile.photos = currentUser.profile.photos.slice(-5); // Keep only the last 5 photos
-        }
-
-        await currentUser.save();
-        res.json({ status: 'success', message: 'Photos uploaded successfully!' });
-    } catch (err) {
-        console.error('Error uploading photos:', err);
-        res.status(500).json({ status: 'error', message: 'Failed to upload photos.' });
-    }
+    // photos.ejs expects JSON
+    res.json({ status: 'success', message: 'Photos uploaded.', count: merged.length });
+  } catch (err) {
+    console.error('POST /photos/upload', err);
+    res.status(500).json({ status: 'error', message: 'Upload failed.' });
+  }
 });
 
+// ====================================================================
+// POST /photos/delete/:photoIndex   (photos.ejs delete form uses :idx)
+// ====================================================================
 app.post('/photos/delete/:photoIndex', checkAuth, async (req, res) => {
-    try {
-        const currentUser = await User.findById(req.session.userId);
-        const photoIndex = parseInt(req.params.photoIndex);
-        
-        if (photoIndex < 0 || photoIndex >= currentUser.profile.photos.length) {
-            return res.status(400).json({ status: 'error', message: 'Invalid photo index.' });
-        }
+  try {
+    const idx = parseInt(req.params.photoIndex, 10);
+    if (Number.isNaN(idx)) return res.status(400).json({ status: 'error', message: 'Bad index' });
 
-        const photoPath = currentUser.profile.photos[photoIndex];
-        
-        currentUser.profile.photos.splice(photoIndex, 1);
-        await currentUser.save();
-        
-        fs.unlink(photoPath, (err) => {
-            if (err) {
-                console.error('Error deleting photo file from disk:', err);
-            }
-        });
-        
-        res.json({ status: 'success', message: 'Photo deleted successfully.' });
-    } catch (err) {
-        console.error('Error deleting photo:', err);
-        res.status(500).json({ status: 'error', message: 'Failed to delete photo.' });
+    const meId = req.session.userId;
+    const me = await User.findById(meId).select('profile.photos').lean();
+    const arr = Array.isArray(me?.profile?.photos) ? me.profile.photos.slice() : [];
+
+    if (idx < 0 || idx >= arr.length) {
+      return res.status(404).json({ status: 'error', message: 'Photo not found' });
     }
+
+    arr.splice(idx, 1);
+    await User.updateOne({ _id: meId }, { $set: { 'profile.photos': arr } });
+    res.json({ status: 'success', message: 'Photo deleted.', count: arr.length });
+  } catch (err) {
+    console.error('POST /photos/delete/:photoIndex', err);
+    res.status(500).json({ status: 'error', message: 'Delete failed.' });
+  }
 });
 
+app.post('/photos/delete', checkAuth, async (req, res) => {
+  try {
+    const photoUrl = (req.body.photoUrl || '').toString().trim();
+    if (!photoUrl) return res.status(400).json({ status: 'error', message: 'Missing photoUrl' });
 
-app.post('/delete-photo/:photoIndex', checkAuth, async (req, res) => {
-    try {
-        const currentUser = await User.findById(req.session.userId);
-        const photoIndex = req.params.photoIndex;
-        
-        if (photoIndex < 0 || photoIndex >= currentUser.profile.photos.length) {
-            return res.status(400).json({ error: 'Invalid photo index.' });
-        }
+    const meId = req.session.userId;
+    const me = await User.findById(meId).select('profile.photos').lean();
+    const arr = Array.isArray(me?.profile?.photos) ? me.profile.photos.slice() : [];
 
-        const photoPath = currentUser.profile.photos[photoIndex];
-        
-        currentUser.profile.photos.splice(photoIndex, 1);
-        await currentUser.save();
-        
-        fs.unlink(photoPath, (err) => {
-            if (err) {
-                console.error('Error deleting photo file:', err);
-            }
-        });
-        
-        res.status(200).json({ message: 'Photo deleted successfully.' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Server Error');
+    const next = arr.filter(p => p !== photoUrl);
+    if (next.length === arr.length) {
+      return res.status(404).json({ status: 'error', message: 'Photo not found' });
     }
+
+    await User.updateOne({ _id: meId }, { $set: { 'profile.photos': next } });
+    res.json({ status: 'success', message: 'Photo deleted.', count: next.length });
+  } catch (err) {
+    console.error('POST /photos/delete', err);
+    res.status(500).json({ status: 'error', message: 'Delete failed.' });
+  }
 });
 
 app.post('/unmatch/:id', checkAuth, async (req, res) => {
@@ -1786,20 +1820,107 @@ app.post('/unmatch/:id', checkAuth, async (req, res) => {
   }
 });
 
-app.post('/block/:id', checkAuth, async (req, res) => {
-    try {
-        const currentUserId = req.session.userId;
-        const blockUserId = req.params.id;
+app.post('/unblock/:id', checkAuth, async (req, res) => {
+  try {
+    const meId = String(req.session.userId || '');
+    const unblockedId = String(req.params.id || '');
 
-        await User.findByIdAndUpdate(currentUserId, { $push: { blockedUsers: blockUserId } });
-        await User.findByIdAndUpdate(currentUserId, { $pull: { likes: blockUserId } });
-        await User.findByIdAndUpdate(blockUserId, { $pull: { likes: currentUserId } });
-
-        res.json({ status: 'success', message: 'User blocked successfully.' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ status: 'error', message: 'Server Error' });
+    if (!ObjectId.isValid(unblockedId)) {
+      return wantJson(req, res)
+        ? res.status(400).json({ status: 'error', message: 'Invalid user id' })
+        : res.redirect('/blocked?msg=invalid');
     }
+    if (meId === unblockedId) {
+      return wantJson(req, res)
+        ? res.status(400).json({ status: 'error', message: 'Cannot unblock yourself' })
+        : res.redirect('/blocked?msg=self');
+    }
+
+    // Pull from my blockedUsers
+    const result = await User.updateOne(
+      { _id: meId },
+      { $pull: { blockedUsers: unblockedId } }
+    );
+
+    const ok = result.modifiedCount > 0;
+
+    if (wantJson(req, res)) {
+      return res.json({ status: ok ? 'success' : 'unchanged' });
+    }
+    return res.redirect('/blocked?msg=' + (ok ? 'unblocked' : 'unchanged'));
+  } catch (err) {
+    console.error('unblock error', err);
+    return wantJson(req, res)
+      ? res.status(500).json({ status: 'error', message: 'Server error' })
+      : res.redirect('/blocked?msg=error');
+  }
+});
+
+// helper: detect if client prefers JSON (XHR/fetch) or HTML redirect
+function wantJson(req, res) {
+  const h = (req.headers['x-requested-with'] || '').toLowerCase();
+  const a = (req.headers['accept'] || '').toLowerCase();
+  return h === 'xmlhttprequest' || a.includes('application/json');
+}
+
+app.post('/block/:id', checkAuth, async (req, res) => {
+  try {
+    const currentUserId = String(req.session.userId || '');
+    const blockUserId   = String(req.params.id || '');
+
+    if (!ObjectId.isValid(blockUserId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid user id' });
+    }
+    if (currentUserId === blockUserId) {
+      return res.status(400).json({ status: 'error', message: 'Cannot block yourself' });
+    }
+
+    // 1) Add to blockedUsers once
+    await User.updateOne(
+      { _id: currentUserId },
+      { $addToSet: { blockedUsers: blockUserId } }   // <-- no duplicates
+    );
+
+    // 2) Remove any likes in both directions to avoid stale “match”
+    await Promise.all([
+      User.updateOne({ _id: currentUserId }, { $pull: { likes: blockUserId, favorites: blockUserId, likedBy: blockUserId } }),
+      User.updateOne({ _id: blockUserId },  { $pull: { likes: currentUserId, favorites: currentUserId, likedBy: currentUserId } }),
+    ]);
+
+    // 3) (Optional) also close any open chat threads between them, or mark muted — if you have a Message/Thread model.
+
+    return res.json({ status: 'success', message: 'User blocked successfully.' });
+  } catch (err) {
+    console.error('block error', err);
+    return res.status(500).json({ status: 'error', message: 'Server Error' });
+  }
+});
+
+// GET /block/:id  -> show confirm
+app.get('/block/:id', checkAuth, async (req, res) => {
+  const meId = req.session.userId;
+  const id   = req.params.id;
+  const [currentUser, targetUser, me] = await Promise.all([
+    User.findById(meId).select('username profile.photos').lean(),
+    User.findById(id).lean(),
+    User.findById(meId).select('blockedUsers').lean(),
+  ]);
+  const blockedUsers = me?.blockedUsers?.length
+    ? await User.find({ _id: { $in: me.blockedUsers } })
+        .select('username profile.photos profile.city profile.country').lean()
+    : [];
+  res.render('blocked', { pageTitle: 'Blocked users', currentUser, targetUser, blockedUsers });
+});
+
+// GET /blocked
+app.get('/blocked', checkAuth, async (req, res) => {
+  const me = await User.findById(req.session.userId).select('blockedUsers').lean();
+  const blockedUsers = me?.blockedUsers?.length
+    ? await User.find({ _id: { $in: me.blockedUsers } })
+        .select('username profile.photos profile.city profile.country').lean()
+    : [];
+  const currentUser = await User.findById(req.session.userId).select('username profile.photos').lean();
+  res.render('blocked', { pageTitle: 'Blocked users', currentUser, targetUser: null, blockedUsers });
 });
 
 // --- helper: compute "is online" from lastActive (5m window)
@@ -2302,59 +2423,11 @@ app.get('/viewed-you', checkAuth, async (req, res) => {
   }
 });
 
-
-// ---------- helpers (keep these) ----------
-const dayKey = (d = new Date()) => new Date(d).toDateString();
-
-// 1 free reveal/day for non-premium; premium is always revealed
-function canRevealLikesToday(req, isPremium) {
-  if (isPremium) return true;
-  return req.session?.likesYouRevealDay === dayKey();
-}
-function markRevealedLikesToday(req) {
-  req.session.likesYouRevealDay = dayKey();
-}
-
-// Optional legacy middleware you might use elsewhere; canonicalized keys
-function requirePremiumOrDailyReveal(limit = 1, { graceHours = 72, verifiedBonus = 1 } = {}) {
-  return async (req, res, next) => {
-    const u = await User.findById(req.session.userId);
-    if (!u) return res.redirect('/login');
-
-    if (isPremiumOrBetter(u)) return next();
-
-    // Grace example (keep your own logic)
-    const createdAt = u.createdAt ? new Date(u.createdAt).getTime() : 0;
-    const nowMs = Date.now();
-    const graceOk = !!createdAt && (nowMs - createdAt) <= graceHours * 3600 * 1000;
-    if (graceOk) return next();
-
-    // Daily counters on user doc (optional)
-    const today = dayKey();
-    if (u.likesYouRevealDay !== today) {
-      u.likesYouRevealDay = today;
-      u.likesYouRevealCount = 0;
-    }
-    const allowance = limit + (u.verifiedAt ? verifiedBonus : 0);
-    if ((u.likesYouRevealCount || 0) < allowance) {
-      u.likesYouRevealCount = (u.likesYouRevealCount || 0) + 1;
-      await u.save();
-      req.session.likesYouRevealDay = today;
-      return next();
-    }
-
-    return res.status(402).render('paywall', {
-      feature: 'Who liked you',
-      allowance, used: u.likesYouRevealCount
-    });
-  };
-}
 // ---------- "Who Liked You" ----------
 app.get('/likes-you', checkAuth, async (req, res) => {
   try {
-    const meId  = req.session.userId;
+    const meId = req.session.userId;
 
-    // We need: premium flag, my likes (to remove mutuals), my likedBy, blocked
     const currentUser = await User.findById(meId)
       .select('isPremium plan likes likedBy blockedUsers')
       .lean();
@@ -2362,18 +2435,14 @@ app.get('/likes-you', checkAuth, async (req, res) => {
 
     const isPremium = !!currentUser.isPremium || (currentUser.plan && currentUser.plan !== 'free');
 
-    // Build the candidate list:
-    //  - start from likedBy
-    //  - remove anyone I’ve already liked (mutuals)
-    //  - remove blocked
-    const myLikesSet     = new Set((currentUser.likes || []).map(String));
-    const blockedSet     = new Set((currentUser.blockedUsers || []).map(String));
-    // newest first if your likedBy is chronological
+    const myLikesSet = new Set((currentUser.likes || []).map(String));
+    const blockedSet = new Set((currentUser.blockedUsers || []).map(String));
+
     const likerIds = (currentUser.likedBy || [])
       .map(String)
       .filter(uid => !myLikesSet.has(uid))
       .filter(uid => !blockedSet.has(uid))
-      .reverse();
+      .reverse(); // newest first if likedBy is chronological
 
     // paging
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
@@ -2386,13 +2455,19 @@ app.get('/likes-you', checkAuth, async (req, res) => {
       username: 1, verifiedAt: 1, lastActive: 1,
       'profile.age': 1, 'profile.city': 1, 'profile.country': 1, 'profile.photos': 1
     };
-    const people = slice.length
+
+    const peopleDocs = slice.length
       ? await User.find({ _id: { $in: slice } }).select(projection).lean()
       : [];
 
+    // restore the original order of `slice`
+    const order = new Map(slice.map((id, i) => [String(id), i]));
+    const people = peopleDocs.sort(
+      (a, b) => (order.get(String(a._id)) ?? 0) - (order.get(String(b._id)) ?? 0)
+    );
+
     const revealed = canRevealLikesToday(req, isPremium);
 
-    // unread counts (messages respects soft-delete, notifs as-is)
     const [unreadMessages, unreadNotificationCount] = await Promise.all([
       Message.countDocuments({
         recipient: meId,
@@ -2406,40 +2481,39 @@ app.get('/likes-you', checkAuth, async (req, res) => {
     req.session.justRevealedLikes = undefined;
 
     return res.render('likes-you', {
+      pageTitle: 'Who Liked You',
       currentUser: { _id: meId, isPremium },
       people,
-      blurred: !revealed, // <-- your EJS overlay key
-      justRevealed: req.query.revealed === '1',
-      pageMeta: {
-        page, limit, total, totalPages: Math.max(Math.ceil(total / limit), 1)
-      },
+      usersWhoLikedMe: people,   // alias for older EJS
+      blurred: !revealed,
+      justRevealed: req.query.revealed === '1' || justRevealed,
+      pageMeta: { page, limit, total, totalPages: Math.max(Math.ceil(total / limit), 1) },
       unreadMessages,
       unreadNotificationCount,
     });
+
   } catch (e) {
     console.error('likes-you err', e);
     return res.status(500).render('error', { status: 500, message: 'Failed to load Liked You.' });
   }
 });
 
-// POST /likes-you/reveal  (non-premium gets 1 free reveal per day)
+
 app.post('/likes-you/reveal', checkAuth, async (req, res) => {
-  try {
-    const me = await User.findById(req.session.userId).select('isPremium plan').lean();
-    if (!me) return res.redirect('/login');
+  const me = await User.findById(req.session.userId).select('isPremium plan').lean();
+  if (!me) return res.redirect('/login');
 
-    const isPremium = !!me.isPremium || (me.plan && me.plan !== 'free');
-    if (!isPremium) markRevealedLikesToday(req); // premium is always unblurred
+  const isPremium = isPremiumOrBetter(me);
+  if (!isPremium) markRevealedLikesToday(req);    // marks today in session
 
-    // NEW: flash a “just revealed” once
-    req.session.justRevealedLikes = true;
+  req.session.justRevealedLikes = true;           // flash for UI
 
-    return res.redirect(303, '/likes-you');
-  } catch (e) {
-    console.error('likes-you reveal err', e);
-    return res.redirect('/likes-you');
-  }
+  // ensure session is persisted before redirect
+  req.session.save(() => {
+    res.redirect(303, '/likes-you?revealed=1');
+  });
 });
+
 
 app.get('/notifications', checkAuth, async (req, res) => {
   try {

@@ -2,11 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* your optional custom CSS after layers */
-:root { --brand: #ff6b6b; }
-html, body {
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
-}
 
 /* Tailwind v4 single import */
 @import "tailwindcss";
@@ -14,13 +9,21 @@ html, body {
 /* Load daisyUI v5 plugin in v4 style */
 @plugin "daisyui";
 
-/* If you use Tailwind v4’s @theme, keep it consistent */
-@theme {
-  --font-sans: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto,
-               "Helvetica Neue", Arial, sans-serif;
-}
 
-/* Global default */
+/* === Global font override === */
 @layer base {
-  html { font-family: var(--font-sans); }
+  :root {
+    --font-sans: "DM Sans", "Inter", system-ui, -apple-system, "Segoe UI",
+                 Roboto, "Helvetica Neue", Arial, "Noto Sans",
+                 "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+                 sans-serif;
+  }
+
+  html, body {
+    font-family: var(--font-sans);
+    font-size: 16px;         /* Adjust base size here */
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }

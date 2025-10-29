@@ -1,6 +1,4 @@
 <!-- views/partials/head.ejs -->
-<!DOCTYPE html>
-<html lang="en" data-theme="afrovibe">
 <head>
   <meta charset="utf-8" />
   <title><%= pageTitle || 'AfroVibe' %></title>
@@ -9,26 +7,27 @@
   <meta name="theme-color" content="#f97316" />
   <link rel="icon" href="/favicon.ico" />
 
-  <!-- Typography: Inter (neutral, modern, super legible) -->
+  <!-- Inter font -->
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Compiled Tailwind/Daisy (your bundles) -->
+  <!-- CSS bundles -->
   <link rel="stylesheet" href="/css/tw.css?v=afro2">
-  <link rel="stylesheet" href="/css/output.css?v=<%= Date.now() %>"><!-- cache-bust -->
+  <link rel="stylesheet" href="/css/output.css?v=<%= Date.now() %>">
 
-  <% // Use nonce only if provided to satisfy CSP without throwing "nonce is not defined" %>
-  <% const _nonce = (typeof nonce !== 'undefined' && nonce) ? String(nonce) : ''; %>
+  <% const _nonce = (typeof cspNonce !== 'undefined' && cspNonce) ? String(cspNonce) : '' %>
+
+  <!-- Inline styles need nonce to pass CSP -->
   <style <% if (_nonce) { %>nonce="<%= _nonce %>"<% } %>>
     :root {
-      --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+      --font-sans: "DM Sans", "Inter", system-ui, "-apple-system", "Segoe UI", "Roboto",
                    "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
                    "Segoe UI Emoji","Segoe UI Symbol", sans-serif;
     }
     html, body { font-family: var(--font-sans); font-size: 16px; }
   </style>
 
-  <!-- Socket.IO client (served automatically by your server at this path) -->
-  <script src="/socket.io/socket.io.js" defer></script>
+  <!-- Socket.IO client (nonce; load before your app scripts) -->
+  <script <% if (_nonce) { %>nonce="<%= _nonce %>"<% } %> src="/socket.io/socket.io.js" defer></script>
 </head>

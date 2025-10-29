@@ -1,181 +1,213 @@
-// profile.js — all client logic for /my-profile (CSP-safe, no inline handlers)
-
+// public/js/profile.js — client logic for views/profile.ejs (CSP-safe)
 (function () {
-  // Tabs
-  const tabs = document.querySelectorAll('[role="tab"]');
-  const showTab = (name) => {
-    const ov = document.getElementById('tab-overview');
-    const ed = document.getElementById('tab-edit');
-    if (!ov || !ed) return;
-    ov.classList.toggle('hidden', name !== 'overview');
-    ed.classList.toggle('hidden', name !== 'edit');
-    tabs.forEach((b) => b.classList.toggle('tab-active', b.dataset.tab === name));
-  };
-  tabs.forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
-  showTab('overview');
+  const VIEWED_ID   = (document.querySelector('main')?.dataset?.viewedId) || (window.VIEWED_ID) || null; // optional
+  const iconLike    = document.getElementById('iconLike');
+  const btnLike     = document.getElementById('btnLike');
+  const btnSL       = document.getElementById('btnSuperlike');
+  const btnWave     = document.getElementById('btnWave');
+  const btnFav      = document.getElementById('btnFavorite');
+  const btnCall     = document.getElementById('btnCall');
+  const btnBlock    = document.getElementById('btnBlock');
+  const btnReport   = document.getElementById('btnReport');
+  const reportDlg   = document.getElementById('reportDialog');
+  const reportForm  = document.getElementById('reportForm');
+  const reportCancelBtn = document.getElementById('reportCancelBtn');
 
-  // Socket notifications
-  try {
-    const me = document.querySelector('body').dataset?.me || window.__ME__;
-    const socket = window.io();
-    socket.on('connect', () => {
-      if (me) socket.emit('register_for_notifications', me);
-    });
-    socket.on('new_notification', (n) => {
-      toast(n.type === 'match' ? `🎉 ${n.message}` : `🔔 ${n.message}`, n.type === 'match' ? 'success' : 'info');
-    });
-  } catch {}
+  // read the user id from server-rendered HTML safely
+  const uid = (function(){
+    const el = document.querySelector('a[href^="/chat/"]');
+    if (el) { const m = el.getAttribute('href').match(/\/chat\/([a-f0-9]{24})/i); if (m) return m[1]; }
+    const hero = document.getElementById('heroPhoto');
+    return hero?.getAttribute('data-user-id') || null;
+  })();
 
-  // Photo previews
-  document.querySelectorAll('input[type=file][name="photos"]').forEach((input) => {
-    input.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      const img = e.target.closest('label')?.querySelector('.preview-img');
-      if (!img) return;
-      const url = URL.createObjectURL(file);
-      img.src = url;
+  function $(s, r=document){ return r.querySelector(s); }
+  function $$(s, r=document){ return Array.from(r.querySelectorAll(s)); }
+
+  function toast(msg, kind='default') {
+    const el = $('#toast'), inner = $('#toastInner');
+    if (!el || !inner) return alert(msg);
+    inner.textContent = msg;
+    inner.className = 'px-4 py-2 rounded-xl shadow-lg text-sm ' + (kind==='error' ? 'bg-red-700 text-white' :
+                                                                    kind==='ok'    ? 'bg-emerald-700 text-white' :
+                                                                                     'bg-neutral text-neutral-content');
+    el.classList.remove('hidden');
+    clearTimeout(el._t); el._t = setTimeout(()=>el.classList.add('hidden'), 2000);
+  }
+
+  // Photo thumb -> hero
+  $$('.thumbBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const src = btn.getAttribute('data-photo');
+      const hero = $('#heroPhoto');
+      if (src && hero) hero.src = src;
     });
   });
 
-  // Location save (both buttons)
-  function wireLocation(btn) {
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-      if (!navigator.geolocation) {
-        toast('Geolocation not supported on this device', 'error');
-        return;
-      }
-      btn.disabled = true;
-      btn.classList.add('btn-disabled');
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          try {
-            const r = await fetch('/api/profile/location', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'same-origin',
-              body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            });
-            const data = await r.json();
-            if (data.ok) toast('Location saved. Distance will appear on cards.', 'success');
-            else toast('Could not save location', 'error');
-          } catch {
-            toast('Network error saving location', 'error');
-          } finally {
-            btn.disabled = false;
-            btn.classList.remove('btn-disabled');
-          }
-        },
-        (err) => {
-          toast(err?.message || 'Permission denied for geolocation', 'error');
-          btn.disabled = false;
-          btn.classList.remove('btn-disabled');
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    });
-  }
-  wireLocation(document.getElementById('setLocationBtn'));
-  wireLocation(document.getElementById('setLocationBtnBottom'));
-
-  // Boost
-  const boostBtn = document.getElementById('boostBtn');
-  const boostBadge = document.getElementById('boostBadge');
-  const boostCountdown = document.getElementById('boostCountdown');
-
-  function startBoostCountdown(expiresIso) {
-    if (!expiresIso || !boostBadge || !boostCountdown) return;
-    boostBadge.classList.remove('hidden');
-    const end = new Date(expiresIso).getTime();
-    const tick = () => {
-      const remain = Math.max(0, end - Date.now());
-      const m = Math.floor(remain / 60000);
-      const s = Math.floor((remain % 60000) / 1000);
-      boostCountdown.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-      if (remain <= 0) {
-        boostBadge.classList.add('hidden');
-        clearInterval(timer);
-      }
-    };
-    tick();
-    const timer = setInterval(tick, 1000);
-  }
-
-  // Initialize existing boost countdown if active
-  if (boostBadge?.dataset?.expires) {
-    const t = new Date(boostBadge.dataset.expires).getTime();
-    if (Number.isFinite(t) && t > Date.now()) startBoostCountdown(boostBadge.dataset.expires);
-  }
-
-  if (boostBtn) {
-    boostBtn.addEventListener('click', async () => {
-      boostBtn.disabled = true;
+  // LIKE / UNLIKE
+  if (btnLike) {
+    btnLike.addEventListener('click', async ()=>{
+      if (!uid) return;
+      btnLike.disabled = true;
       try {
-        const r = await fetch('/api/boost', { method: 'POST', credentials: 'same-origin' });
-        const data = await r.json();
-        if (data.ok) {
-          toast('🚀 Profile boosted for 30 minutes!', 'success');
-          startBoostCountdown(data.boostExpiresAt);
-        } else {
-          toast(data.message || 'Could not activate boost', 'error');
+        const isLikedNow = iconLike?.classList.contains('text-rose-600');
+        const path = isLikedNow ? `/dislike/${uid}` : `/like/${uid}`;
+        const res = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'} });
+        const data = await res.json().catch(()=>({}));
+        if (!res.ok) {
+          toast(data?.message || (res.status===429?'Daily like limit reached':'Failed'), 'error');
+          return;
         }
-      } catch {
-        toast('Network error while boosting', 'error');
-      } finally {
-        boostBtn.disabled = false;
-      }
+        iconLike?.classList.toggle('text-rose-600', !isLikedNow);
+        toast(!isLikedNow ? 'Liked ❤️' : 'Removed like', 'ok');
+        if (data?.status === 'match' || data?.threadUrl) toast('It’s a match! 🎉', 'ok');
+      } catch { toast('Network error', 'error'); }
+      finally { btnLike.disabled = false; }
     });
   }
 
-  // Copy profile link
-  const copyBtn = document.getElementById('copyLinkBtn');
-  if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-      const url = `${location.origin}/u/${encodeURIComponent(
-        document.querySelector('h1')?.textContent?.trim() || 'me'
-      )}`;
+  // SUPER-LIKE
+  if (btnSL) {
+    btnSL.addEventListener('click', async ()=>{
+      if (!uid) return;
+      btnSL.disabled = true;
       try {
-        await navigator.clipboard.writeText(url);
-        toast('Link copied to clipboard', 'info');
-      } catch {
-        toast('Could not copy link', 'error');
-      }
+        const res = await fetch(`/superlike/${uid}`, { method:'POST' });
+        const data = await res.json().catch(()=>({}));
+        if (!res.ok) {
+          toast(data?.error==='limit'?'Out of super-likes for today':
+               data?.error==='cooldown'?'Please wait before super-liking again':'Super-like failed','error');
+          return;
+        }
+        iconLike?.classList.add('text-rose-600');
+        toast('Sent a Super-like ⚡','ok');
+      } catch { toast('Network error','error'); }
+      finally { btnSL.disabled = false; }
     });
   }
 
-  // Completion meter (simple heuristic)
-  try {
-    const fields = [
-      !!document.querySelector('img[alt$="avatar"]')?.getAttribute('src')?.includes('default-avatar') === false,
-      !!textValue('<%= currentUser?.profile?.bio %>'),
-      !!textValue('<%= currentUser?.profile?.age %>'),
-      !!textValue('<%= currentUser?.profile?.gender %>'),
-      !!textValue('<%= currentUser?.profile?.occupation %>'),
-      (('<%= (currentUser?.profile?.interests||[]) %>'.length || 0) > 2),
-    ];
-    const pct = Math.round((fields.filter(Boolean).length / fields.length) * 100);
-    const bar = document.getElementById('completionBar');
-    const lbl = document.getElementById('completionPct');
-    if (bar) bar.value = pct;
-    if (lbl) lbl.textContent = `${pct}%`;
-  } catch {}
-  function textValue(s) {
-    return typeof s === 'string' && s.trim().length ? s.trim() : '';
+  // WAVE / INTEREST
+  if (btnWave) {
+    btnWave.addEventListener('click', async ()=>{
+      if (!uid) return;
+      btnWave.disabled = true;
+      try {
+        const res = await fetch(`/interest/${uid}`, { method:'POST' });
+        const data = await res.json().catch(()=>({}));
+        if (!res.ok) {
+          toast(data?.error==='cooldown'?'You recently waved — try again soon':'Wave failed','error');
+          return;
+        }
+        toast(data?.state==='sent'?'Waved 👋':'Already waved','ok');
+      } catch { toast('Network error','error'); }
+      finally { btnWave.disabled = false; }
+    });
   }
 
-  // Toast helper (daisyUI)
-  function toast(msg, type = 'info') {
-    const box = document.getElementById('toasts');
-    if (!box) return;
-    const el = document.createElement('div');
-    el.className = `alert alert-${type}`;
-    el.innerHTML = `<span>${msg}</span>`;
-    box.appendChild(el);
-    setTimeout(() => {
-      el.classList.add('opacity-0');
-      el.style.transition = 'opacity .4s';
-    }, 2200);
-    setTimeout(() => el.remove(), 2700);
+  // FAVORITE toggle
+  if (btnFav) {
+    btnFav.addEventListener('click', async ()=>{
+      if (!uid) return;
+      btnFav.disabled = true;
+      try {
+        const res = await fetch(`/favorite/${uid}`, { method:'POST' });
+        const data = await res.json().catch(()=>({}));
+        if (data?.state === 'unchanged') {
+          const r2 = await fetch(`/favorite/${uid}`, { method:'DELETE' });
+          const d2 = await r2.json().catch(()=>({}));
+          toast(d2?.state==='removed'?'Removed from favorites':'Favorite updated','ok');
+        } else {
+          toast('Added to favorites ⭐','ok');
+        }
+      } catch { toast('Favorite failed','error'); }
+      finally { btnFav.disabled = false; }
+    });
   }
+
+  // CALL REQUEST
+  if (btnCall) {
+    btnCall.addEventListener('click', async ()=>{
+      if (!uid) return;
+      btnCall.disabled = true;
+      try {
+        const res = await fetch(`/api/call/request/${uid}`, { method:'POST' });
+        const data = await res.json().catch(()=>({}));
+        if (!res.ok) {
+          toast(
+            res.status===402 || data?.error==='elite_required' ? 'Elite required for video chat' :
+            data?.error==='not_allowed' ? 'Both users must be verified & opted-in' :
+            data?.error==='cooldown' ? 'You can request again later' : 'Call request failed',
+            'error'
+          );
+          return;
+        }
+        toast('Ringing… 📲','ok');
+      } catch { toast('Network error','error'); }
+      finally { btnCall.disabled = false; }
+    });
+  }
+
+  // REPORT
+  if (btnReport && reportDlg && reportForm) {
+    btnReport.addEventListener('click', () => { try { reportDlg.showModal(); } catch { /* no-op */ } });
+    if (reportCancelBtn) reportCancelBtn.addEventListener('click', () => { try { reportDlg.close(); } catch {} });
+
+    reportForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      if (!uid) return;
+      const fd = new FormData(reportForm);
+      const payload = {
+        reportedUserId: uid,
+        reason: fd.get('reason') || '',
+        details: fd.get('details') || ''
+      };
+      try {
+        const res = await fetch('/report-user', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(()=>({}));
+        if (res.ok && data?.status === 'success') {
+          toast('Report submitted. Thank you 🙏','ok');
+          try { reportDlg.close(); } catch {}
+        } else {
+          toast(data?.message || 'Report failed','error');
+        }
+      } catch { toast('Network error','error'); }
+    });
+  }
+
+  if (btnBlock) btnBlock.addEventListener('click', async () => {
+  if (!uid) return;
+  if (!confirm('Block this user? You won’t see each other.')) return;
+
+  btnBlock.disabled = true;
+  try {
+    const res = await fetch(`/block/${uid}`, {
+      method: 'POST',
+      credentials: 'same-origin',           // <-- ensure session cookie is sent
+      headers: { 'Accept': 'application/json' }
+    });
+
+    const isJson = (res.headers.get('content-type') || '').includes('application/json');
+    const data = isJson ? (await res.json().catch(()=>({}))) : null;
+
+    if (!res.ok) {
+      // if you got bounced to login (HTML), show a helpful message
+      const msg = data?.message || (res.status === 401 || res.status === 403
+                  ? 'Please log in again.' : 'Could not block');
+      toast(msg, 'error');
+      btnBlock.disabled = false;
+      return;
+    }
+
+    toast('User blocked', 'ok');
+    // Optional: disable all action buttons after block
+    ['btnLike','btnSuperlike','btnWave','btnFavorite','btnCall','btnBlock','btnReport']
+      .forEach(id => { const b = document.getElementById(id); if (b) b.disabled = true; });
+  } catch {
+    toast('Network error', 'error');
+    btnBlock.disabled = false;
+  }
+});
 })();

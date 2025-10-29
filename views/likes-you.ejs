@@ -5,97 +5,98 @@
     <%- include('partials/navbar.ejs') %>
 
     <main class="container mx-auto p-4 flex-grow">
-      <input type="hidden" id="currentUserId" value="<%= currentUser._id %>">
+  <input type="hidden" id="currentUserId" value="<%= currentUser._id %>">
 
-      <!-- Header + actions (Reveal / Upgrade) -->
-      <header class="mb-6 flex items-center justify-between">
-        <div>
-          <h1 class="text-3xl font-bold">Who Liked You</h1>
-          <p class="opacity-70 text-sm">Like back to create a match and start chatting.</p>
-        </div>
+  <!-- Header + actions (Reveal / Upgrade) -->
+  <header class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl md:text-2xl font-semibold">Who Liked You</h1>
+      <p class="opacity-70 text-xs md:text-sm">Like back to create a match and start chatting.</p>
+    </div>
 
-        <% if (typeof justRevealed !== 'undefined' && justRevealed) { %>
-  <div class="alert alert-success mb-4">
-    <span>Your likes are revealed for today. Have fun! 🎉</span>
-  </div>
-<% } %>
+    <% 
+      // --- SAFE GUARDS ---
+      const list = Array.isArray(usersWhoLikedMe) ? usersWhoLikedMe
+                 : Array.isArray(users)          ? users
+                 : Array.isArray(likers)         ? likers
+                 : [];
+      const _blurred       = typeof blurred !== 'undefined' ? !!blurred : false;
+      const _justRevealed  = typeof justRevealed !== 'undefined' ? !!justRevealed : false;
+    %>
 
-        <% if (blurred) { %>
-          <form method="post" action="/likes-you/reveal" class="flex items-center gap-2">
-            <button class="btn btn-accent btn-sm" type="submit">Reveal (1 free today)</button>
-            <a href="/upgrade" class="btn btn-primary btn-sm">Upgrade to unlock all</a>
-          </form>
+    <% if (_blurred) { %>
+      <form method="post" action="/likes-you/reveal" class="flex items-center gap-2">
+        <button class="btn btn-accent btn-sm" type="submit">Reveal (1 free today)</button>
+        <a href="/upgrade" class="btn btn-primary btn-sm">Upgrade to unlock all</a>
+      </form>
+    <% } else { %>
+      <div class="flex items-center gap-2">
+        <% if (_justRevealed) { %>
+          <span class="badge badge-success">Unlocked today 🎉</span>
         <% } else { %>
-          <div class="flex items-center gap-2">
-            <span class="badge badge-success">Unlocked</span>
-            <a href="/upgrade" class="btn btn-ghost btn-sm">Manage plan</a>
-          </div>
+          <span class="badge badge-success">Unlocked</span>
         <% } %>
-      </header>
+        <a href="/upgrade" class="btn btn-ghost btn-sm">Manage plan</a>
+      </div>
+    <% } %>
+  </header>
 
-      <% if (usersWhoLikedMe && usersWhoLikedMe.length) { %>
-        <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <% usersWhoLikedMe.forEach(liker => { 
-               const photo = (liker.profile?.photos?.[0]) || '/images/default-avatar.png';
-          %>
-            <article class="card bg-base-100 shadow hover:shadow-lg transition border border-base-200 relative">
-              <% if (blurred) { %>
-                <!-- Blur overlay (blocks buttons until reveal/upgrade) -->
-                <div class="absolute inset-0 z-10 backdrop-blur-sm bg-base-100/40 flex items-center justify-center">
-                  <div class="text-center">
-                    <div class="text-sm opacity-70 mb-2">Reveal to see details</div>
-                    <form method="post" action="/likes-you/reveal">
-                      <button class="btn btn-accent btn-sm" type="submit">Reveal (1 free today)</button>
-                    </form>
-                    <a href="/upgrade" class="btn btn-ghost btn-xs mt-2">Upgrade to unlock all</a>
-                  </div>
-                </div>
-              <% } %>
-
-              <figure class="relative aspect-[4/5] overflow-hidden bg-base-200">
-                <img src="<%= photo %>" alt="<%= liker.username %>" class="w-full h-full object-cover likeyou-photo">
-                <div class="absolute left-2 top-2 flex gap-1">
-                  <% if (liker.verifiedAt) { %><span class="badge badge-success badge-xs">Verified</span><% } %>
-                  <% if (liker.lastActive && (Date.now()-new Date(liker.lastActive).getTime()<5*60*1000)) { %>
-                    <span class="badge badge-info badge-xs">Online</span>
-                  <% } %>
-                </div>
-              </figure>
-
-              <div class="card-body p-4">
-                <h3 class="card-title text-base">
-                  <span class="truncate"><%= liker.username %></span>
-                  <% if (liker.profile?.age) { %><span class="opacity-70">· <%= liker.profile.age %></span><% } %>
-                </h3>
-                <p class="text-xs opacity-70 truncate">
-                  <%= [liker.profile?.city, liker.profile?.country].filter(Boolean).join(', ') %>
-                </p>
-
-                <div class="card-actions mt-3 grid grid-cols-2 gap-2">
-                  <button class="btn btn-success btn-sm like-back-btn" data-user-id="<%= liker._id %>">Like back</button>
-                  <button class="btn btn-outline btn-sm dislike-btn" data-user-id="<%= liker._id %>">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                    Dislike
-                  </button>
-                </div>
+  <% if (list.length) { %>
+    <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      <% list.forEach(liker => { 
+           const photo = (liker?.profile?.photos?.[0]) || '/images/default-avatar.png';
+      %>
+        <article class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow rounded-2xl relative">
+          <% if (_blurred) { %>
+            <div class="absolute inset-0 z-10 backdrop-blur-sm bg-base-100/40 flex items-center justify-center">
+              <div class="text-center">
+                <div class="text-xs opacity-70 mb-2">Reveal to see details</div>
+                <form method="post" action="/likes-you/reveal">
+                  <button class="btn btn-accent btn-xs" type="submit">Reveal (1 free today)</button>
+                </form>
+                <a href="/upgrade" class="btn btn-ghost btn-2xs mt-2">Upgrade to unlock all</a>
               </div>
-            </article>
-          <% }) %>
-        </div>
-      <% } else { %>
-        <div class="max-w-xl mx-auto bg-base-200 rounded-xl p-8 text-center">
-          <div class="flex justify-center mb-3">
-            <svg class="w-8 h-8 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/>
-            </svg>
+            </div>
+          <% } %>
+
+          <figure class="relative overflow-hidden">
+            <img src="<%= photo %>" alt="<%= liker?.username || '' %>" class="w-full aspect-[4/5] object-cover">
+            <div class="absolute left-2 top-2 flex gap-1">
+              <% if (liker?.verifiedAt) { %><span class="badge badge-success badge-xs rounded-full">Verified</span><% } %>
+              <% if (liker?.lastActive && (Date.now()-new Date(liker.lastActive).getTime()<5*60*1000)) { %>
+                <span class="badge badge-info badge-xs rounded-full">Online</span>
+              <% } %>
+            </div>
+          </figure>
+
+          <div class="p-3">
+            <h3 class="text-[16px] font-semibold leading-tight truncate">
+              <%= liker?.username %><% if (liker?.profile?.age) { %><span class="opacity-70"> · <%= liker.profile.age %></span><% } %>
+            </h3>
+            <p class="text-xs opacity-70 mt-1 truncate">
+              <%= [liker?.profile?.city, liker?.profile?.country].filter(Boolean).join(', ') %>
+            </p>
+
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              <button class="btn btn-xs btn-outline like-back-btn" data-user-id="<%= liker?._id %>">💜 Like back</button>
+              <button class="btn btn-xs btn-ghost border border-base-300 dislike-btn" data-user-id="<%= liker?._id %>">✖ Dislike</button>
+            </div>
           </div>
-          <p>No one has liked you yet. Keep discovering and you’ll show up here.</p>
-        </div>
-      <% } %>
-    </main>
+        </article>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <div class="max-w-xl mx-auto bg-base-200 rounded-xl p-8 text-center">
+      <div class="flex justify-center mb-3">
+        <svg class="w-8 h-8 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/>
+        </svg>
+      </div>
+      <p>No one has liked you yet. Keep discovering and you’ll show up here.</p>
+    </div>
+  <% } %>
+</main>
 
     <!-- Match / Alert modals -->
     <dialog id="alertModal" class="modal">
@@ -122,8 +123,7 @@
     <%- include('partials/footer.ejs') %>
 
     <!-- Scripts (CSP-safe order) -->
-    <script src="/socket.io/socket.io.js" defer></script>
-    <script src="/js/socket.io.js" defer></script>
-    <script src="/js/page-likes-you.js" defer></script>
-  </body>
+    <script nonce="<%= cspNonce %>" src="/js/socket.helper.js" defer></script>
+    <script nonce="<%= cspNonce %>" src="/js/page-likes-you.js" defer></script>
+</body>
 </html>

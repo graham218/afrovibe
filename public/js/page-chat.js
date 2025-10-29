@@ -1,4 +1,5 @@
-// public/js/page-chat.js
+// public/js/page-chat.js (CLEANED)
+// Single-source-of-truth RTC state. No inner re-definitions. No double bindings.
 (function () {
   // ---------- tiny utils ----------
   const $  = (s, r=document) => r.querySelector(s);
@@ -9,15 +10,16 @@
   const getSocket = () => window.__appSocket || window.socket || null;
 
   async function waitForSocketConnected(sock, ms = 5000) {
-  if (!sock) return false;
-  if (sock.connected) return true;
-  return await new Promise((resolve) => {
-    const onConnect = () => { cleanup(); resolve(true); };
-    const t = setTimeout(() => { cleanup(); resolve(false); }, ms);
-    function cleanup() { sock.off('connect', onConnect); clearTimeout(t); }
-    sock.once('connect', onConnect);
-  });
-}
+    if (!sock) return false;
+    if (sock.connected) return true;
+    return await new Promise((resolve) => {
+      const onConnect = () => { cleanup(); resolve(true); };
+      const t = setTimeout(() => { cleanup(); resolve(false); }, ms);
+      function cleanup() { sock.off('connect', onConnect); clearTimeout(t); }
+      sock.once('connect', onConnect);
+    });
+  }
+
   // ---------- DOM refs ----------
   const currentUserId = ($('#currentUserId')?.value || '').trim();
   const otherUserId   = ($('#otherUserId')?.value   || '').trim();
@@ -166,7 +168,7 @@
   }
 
   // bind socket events when available
-  function bindSocketEvents() {
+  function bindSocketChatEvents() {
     const s = getSocket();
     if (!s) return;
 
@@ -207,8 +209,8 @@
   }
 
   // initial attempt + listen for helper’s ping
-  bindSocketEvents();
-  window.addEventListener('socket:ready', bindSocketEvents, { once: true });
+  bindSocketChatEvents();
+  window.addEventListener('socket:ready', bindSocketChatEvents, { once: true });
 
   // ---------- Block / Report ----------
   on(btnBlock, 'click', async () => {
@@ -291,15 +293,16 @@
     rtc.btnEnds  = rtc.modal.querySelectorAll('.rtc-hangup');
   }
 
-  let pc = null;
-  let localStream = null;
-  let peerId = null;
-  let rtcCfg = null;
-  let callActive = false;
+  // Single RTC state (do NOT re-declare these anywhere else)
+  /** @type {RTCPeerConnection | null} */ let pc = null;
+  /** @type {MediaStream | null}        */ let localStream = null;
+  /** @type {boolean}                   */ let callActive = false;
+  /** @type {string}                    */ let peerId = '';
+  /** @type {any}                       */ let rtcCfg = null;
 
   function setStatus(t)     { if (rtc.status) rtc.status.textContent = t || ''; }
-  function openRTCModal()   { try { rtc.modal?.showModal(); } catch {} }
-  function closeRTCModal()  { try { rtc.modal?.close(); } catch {} }
+  function openRTCModal()   { try { rtc.modal?.showModal?.() } catch { rtc.modal?.classList?.remove?.('hidden'); } }
+  function closeRTCModal()  { try { rtc.modal?.close?.() }     catch { rtc.modal?.classList?.add?.('hidden'); } }
 
   function flipUIToIdle() {
     callActive = false;
@@ -307,7 +310,8 @@
       btnCall.textContent = '📹 Video chat';
       btnCall.classList.remove('btn-error');
       btnCall.classList.add('btn-ghost');
-      btnCall.disabled = false;
+      btnCall.removeAttribute('disabled');
+      btnCall.dataset.state = 'idle';
     }
   }
   function flipUIToInCall() {
@@ -316,8 +320,17 @@
       btnCall.textContent = '⛔ End call';
       btnCall.classList.add('btn-error');
       btnCall.classList.remove('btn-ghost');
-      btnCall.disabled = false;
+      btnCall.removeAttribute('disabled');
+      btnCall.dataset.state = 'incall';
     }
+    rtc.incomingUI?.classList?.add('hidden');
+  }
+
+  function getPeerId() {
+    const hidden = document.getElementById('otherUserId')?.value?.trim();
+    const data   = document.querySelector('.video-call-btn')?.dataset?.peerId?.trim();
+    const id = hidden || data || '';
+    return isMongoId(id) ? id : '';
   }
 
   async function fetchRTCConfig() {
@@ -336,7 +349,12 @@
     if (localStream) return localStream;
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:true });
-      if (rtc.vLocal) rtc.vLocal.srcObject = localStream;
+      if (rtc.vLocal) {
+        rtc.vLocal.srcObject = localStream;
+        rtc.vLocal.muted = true;
+        rtc.vLocal.playsInline = true;
+        rtc.vLocal.play?.().catch(()=>{});
+      }
       return localStream;
     } catch {
       setStatus('Camera/mic blocked.');
@@ -355,238 +373,88 @@
       }
     };
     pc.ontrack = (e) => {
-      if (rtc.vRemote) rtc.vRemote.srcObject = e.streams[0];
+      const [stream] = e.streams;
+      if (rtc.vRemote && stream) {
+        rtc.vRemote.srcObject = stream;
+        rtc.vRemote.playsInline = true;
+        rtc.vRemote.play?.().catch(()=>{});
+      }
     };
 
     const ls = await ensureLocal(); if (!ls) return false;
-    ls.getTracks().forEach(t => pc.addTrack(t, ls));
+    if (pc.getSenders().length === 0) {
+      ls.getTracks().forEach(t => pc.addTrack(t, ls));
+    }
     return true;
   }
 
   function teardownRTC() {
-    try { pc?.getSenders()?.forEach(s => s.track && s.track.stop()); } catch {}
-    try { localStream?.getTracks()?.forEach(t => t.stop()); } catch {}
-    try { pc?.close(); } catch {}
+    try { pc?.getSenders?.().forEach(s => s.track && s.track.stop?.()); } catch {}
+    try { localStream?.getTracks?.().forEach(t => t.stop?.()); } catch {}
+    try { pc?.close?.(); } catch {}
     pc = null;
     localStream = null;
     if (rtc.vLocal)  rtc.vLocal.srcObject  = null;
     if (rtc.vRemote) rtc.vRemote.srcObject = null;
+    setStatus('Idle');
     flipUIToIdle();
   }
 
-  (function initChatPage() {
-  // If helper hasn't created the socket yet, wait for it once.
-  if (!window.__appSocket && !window.socket) {
-    window.addEventListener('socket:ready', initChatPage, { once: true });
-    return;
-  }
-  const socket = window.__appSocket || window.socket;
-  if (!socket) return; // hard guard
-
-  // --- bind your rtc listeners here to `socket` (offer/answer/candidate/end) ---
-
-  // Wire call buttons
-  const btnCall = document.querySelector('.video-call-btn');
-  const btnEnd  = document.querySelector('.video-end-btn');
-  btnCall?.addEventListener('click', (e) => { e.preventDefault(); startCall(); });
-  btnEnd?.addEventListener('click', (e) => { e.preventDefault(); endCall(); });
-
-  // Also listen for remote end
-  socket.on('rtc:end', () => teardownRTC());
-})();
-
   async function startCall() {
-    const s = getSocket();
-    if (!s) { alert('Socket not ready for call.'); return; }
+    const sock = getSocket();
+    const isReady = await waitForSocketConnected(sock);
+    if (!isReady) { alert('Connecting… try again in a moment.'); return; }
+    if (!sock)    { alert('Socket not ready for call.'); return; }
 
-    const ok = await waitForSocketConnected(4000);
-    if (!ok) { alert('Connecting… try again in a moment.'); return; }
-
-    const rawPeer =
-      (document.getElementById('otherUserId')?.value || '').trim() ||
-      (btnCall?.dataset?.peerId || '').trim();
-
+    const rawPeer = getPeerId();
     if (!isMongoId(rawPeer)) { alert('Cannot start call: missing user id.'); return; }
     peerId = rawPeer;
 
-    try {
-      openRTCModal();
-      setStatus('Starting…');
+    openRTCModal(); setStatus('Starting…');
+    const inited = await initPC(); if (!inited) return;
 
-      const ready = await initPC(); if (!ready) return;
+    // Optional pre-offer ring
+    try { sock.emit('rtc:call', { to: peerId, meta:{} }); } catch {}
 
-      s.emit('rtc:call', { to: peerId, meta: {} });
+    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+    await pc.setLocalDescription(offer);
+    sock.emit('rtc:offer', { to: peerId, sdp: offer });
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      s.emit('rtc:offer', { to: peerId, sdp: offer });
-
-      setStatus('Calling…');
-      flipUIToInCall();
-    } catch (err) {
-      console.error('[rtc] startCall error', err);
-      alert('Could not start the call.');
-      teardownRTC();
-    }
+    setStatus('Calling…');
+    flipUIToInCall();
   }
 
   function endCall(reason = 'hangup') {
     const s = getSocket();
-    if (s && peerId) s.emit('rtc:end', { to: peerId, reason });
+    const to = peerId || getPeerId();
+    if (s && to) s.emit('rtc:end', { to, reason });
     teardownRTC();
     closeRTCModal();
-  }
-
-  on(btnCall, 'click', () => {
-  const s = window.__appSocket || window.socket;
-  console.log('[rtc] click; socket?', !!s, 'connected?', !!s?.connected);
-});
-
-  // Button: toggle start/end
-  on(btnCall, 'click', (e) => {
-    e.preventDefault();
-    if (callActive) endCall('hangup');
-    else startCall();
-  });
-
-  // Modal controls
-  if (rtc.modal) {
-    on(rtc.modal, 'close', () => teardownRTC());
-
-    rtc.btnMute && on(rtc.btnMute, 'click', () => {
-      const t = localStream?.getAudioTracks?.()[0]; if (!t) return;
-      t.enabled = !t.enabled;
-      rtc.btnMute.classList.toggle('btn-active', !t.enabled);
-      rtc.btnMute.textContent = t.enabled ? 'Mute' : 'Unmute';
-    });
-
-    rtc.btnVideo && on(rtc.btnVideo, 'click', () => {
-      const t = localStream?.getVideoTracks?.()[0]; if (!t) return;
-      t.enabled = !t.enabled;
-      rtc.btnVideo.classList.toggle('btn-active', !t.enabled);
-      rtc.btnVideo.textContent = t.enabled ? 'Video' : 'Video On';
-    });
-
-    rtc.btnEnds && rtc.btnEnds.forEach(b => on(b, 'click', () => endCall('hangup')));
   }
 
   // Socket RTC events
   function bindRTCEvents() {
     const s = getSocket(); if (!s || !isMongoId(otherUserId)) return;
 
-    let pc;                 // your RTCPeerConnection
-let localStream;        // your local MediaStream
-let peerId = '';        // filled when starting
-const rtcModal   = document.getElementById('rtc-modal');
-const statusEl   = document.getElementById('rtc-status');
-const localVideo = document.getElementById('rtc-local');
-const remoteVideo= document.getElementById('rtc-remote');
+    s.off?.('rtc:ring');
+    s.off?.('rtc:offer');
+    s.off?.('rtc:answer');
+    s.off?.('rtc:candidate');
+    s.off?.('rtc:end');
+    s.off?.('rtc:error');
 
-function setStatus(s){ if (statusEl) statusEl.textContent = s; }
-function openRTCModal(){ try { rtcModal?.showModal(); } catch {} }
-function flipUIToInCall(){
-  document.querySelector('.video-call-btn')?.setAttribute('disabled','true');
-  document.querySelector('.video-end-btn')?.classList.remove('hidden');
-  document.querySelector('.video-end-btn')?.removeAttribute('disabled');
-}
-function flipUIToIdle(){
-  document.querySelector('.video-call-btn')?.removeAttribute('disabled');
-  const endBtn = document.querySelector('.video-end-btn');
-  if (endBtn){ endBtn.classList.add('hidden'); endBtn.setAttribute('disabled','true'); }
-}
-
-function stopStream(stream){ try { stream?.getTracks()?.forEach(t => t.stop()); } catch{} }
-function teardownRTC(){
-  try { if (pc) { pc.ontrack = pc.onicecandidate = null; pc.close(); } } catch{}
-  pc = null;
-  stopStream(localStream); localStream = null;
-  if (localVideo)  localVideo.srcObject  = null;
-  if (remoteVideo) remoteVideo.srcObject = null;
-  setStatus('Idle');
-  flipUIToIdle();
-}
-
-async function initPC() {
-  // your existing RTCPeerConnection setup; make sure you set ontrack to remoteVideo
-  pc = new RTCPeerConnection(await fetch('/api/rtc/config').then(r=>r.json()).then(j => j.rtc || {}));
-  pc.ontrack = (e) => { if (remoteVideo) remoteVideo.srcObject = e.streams[0]; };
-  pc.onicecandidate = (e) => {
-    if (e.candidate && peerId && (window.__appSocket || window.socket)) {
-      (window.__appSocket || window.socket).emit('rtc:candidate', { to: peerId, candidate: e.candidate });
-    }
-  };
-  // getUserMedia
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-    if (localVideo) localVideo.srcObject = localStream;
-  } catch (err) {
-    alert('Camera/mic permission denied.'); return false;
-  }
-  return true;
-}
-
-function getPeerId() {
-  const hidden = document.getElementById('otherUserId')?.value?.trim();
-  const data   = document.querySelector('.video-call-btn')?.dataset?.peerId?.trim();
-  return (hidden && /^[a-f0-9]{24}$/i.test(hidden)) ? hidden
-       : (data   && /^[a-f0-9]{24}$/i.test(data))   ? data
-       : '';
-}
-
-async function startCall() {
-  const sock = window.__appSocket || window.socket;
-  const ready = await waitForSocketConnected(sock);
-  if (!ready) { alert('Connecting… try again in a moment.'); return; }
-  if (!sock)  { alert('Socket not ready for call.'); return; }
-
-  const rawPeer = getPeerId();
-  if (!/^[a-f0-9]{24}$/i.test(rawPeer)) { alert('Cannot start call: missing user id.'); return; }
-  peerId = rawPeer;
-
-  openRTCModal(); setStatus('Starting…');
-
-  const okInit = await initPC();
-  if (!okInit) return;
-
-  // notify peer and send offer
-  sock.emit('rtc:call', { to: peerId, meta:{} });
-
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  sock.emit('rtc:offer', { to: peerId, sdp: offer });
-  setStatus('Calling…');
-  flipUIToInCall();
-}
-
-function endCall() {
-  const sock = window.__appSocket || window.socket;
-  if (sock && peerId) sock.emit('rtc:end', { to: peerId, reason: 'hangup' });
-  teardownRTC();
-}
-
-
-    s.off?.('rtc:incoming'); s.off?.('rtc:offer'); s.off?.('rtc:answer');
-    s.off?.('rtc:candidate'); s.off?.('rtc:end'); s.off?.('rtc:error');
-
-    s.on('rtc:incoming', ({ from }) => {
+    s.on('rtc:ring', ({ from }) => {
       if (String(from) !== String(otherUserId)) return;
-      peerId = from;
-      openRTCModal();
-      setStatus('Incoming call…');
       rtc.incomingUI?.classList?.remove('hidden');
-      flipUIToInCall();
     });
 
     const btnAccept  = $('#rtc-accept');
     const btnDecline = $('#rtc-decline');
-
     on(btnAccept, 'click', async () => {
       rtc.incomingUI?.classList?.add('hidden');
       setStatus('Connecting…');
       const ok = await initPC(); if (!ok) return;
     });
-
     on(btnDecline, 'click', () => {
       rtc.incomingUI?.classList?.add('hidden');
       endCall('declined');
@@ -637,6 +505,36 @@ function endCall() {
     });
   }
 
-  bindRTCEvents();
+  // Single wiring for the call button (toggle)
+  function wireCallButtons() {
+    on(btnCall, 'click', (e) => {
+      e.preventDefault();
+      if (callActive) endCall('hangup');
+      else startCall();
+    });
+
+    // Any explicit hangup buttons inside modal
+    rtc.btnEnds && rtc.btnEnds.forEach(b => on(b, 'click', () => endCall('hangup')));
+
+    // Debug click log (optional, keep or remove)
+    on(btnCall, 'click', () => {
+      const s = getSocket();
+      console.log('[rtc] click; socket?', !!s, 'connected?', !!s?.connected);
+    });
+  }
+
+  // Page init
+  function initPage() {
+    bindRTCEvents();
+    wireCallButtons();
+    flipUIToIdle();
+  }
+
+  // Kick off. If socket helper will fire 'socket:ready', re-init after reconnect as well.
+  if (!getSocket()) {
+    window.addEventListener('socket:ready', initPage, { once: true });
+  } else {
+    initPage();
+  }
   window.addEventListener('socket:ready', bindRTCEvents, { once: true });
 })();

@@ -4,46 +4,52 @@
   <body class="bg-base-100 min-h-screen flex flex-col">
     <%- include('partials/navbar.ejs') %>
 
-    <main class="container mx-auto p-4 md:p-8 flex-grow">
+    <main class="container mx-auto px-4 sm:px-5 md:px-8 py-5 flex-grow">
       <!-- Masthead -->
-      <section class="bg-base-200 rounded-2xl shadow-xl p-6 md:p-8">
+      <section class="bg-base-200 rounded-2xl shadow-xl p-5 sm:p-6 md:p-8">
         <div class="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
           <!-- Avatar -->
-          <div class="relative">
+          <div class="relative shrink-0">
             <div class="avatar">
-              <div class="w-40 h-40 md:w-52 md:h-52 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2 shadow">
+              <div class="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2 shadow">
                 <img
                   src="<%= currentUser?.profile?.photos?.[0] || '/images/default-avatar.png' %>"
                   alt="<%= currentUser.username %> avatar" />
               </div>
             </div>
-            <% if (currentUser?.isVerified) { %>
+
+            <% if (currentUser?.verifiedAt) { %>
               <div class="badge badge-success absolute -bottom-2 left-1/2 -translate-x-1/2">Verified</div>
             <% } %>
-            <!-- BEFORE -->
-<% if (currentUser?.isPremium) { %>
-  <span class="badge badge-secondary badge-lg">Premium</span>
-<% } %>
-
-<!-- AFTER (uses helper) -->
-<% if (planOf(currentUser) !== 'free') { %>
-  <span class="badge badge-secondary badge-lg">
-    <%= planOf(currentUser) === 'elite' ? 'Elite' : 'Premium' %>
-  </span>
-<% } %>
           </div>
+          
+          <body
+  data-me="<%= currentUser._id %>"
+  data-has-bio="<%= currentUser?.profile?.bio ? '1' : '0' %>"
+  data-has-age="<%= currentUser?.profile?.age ? '1' : '0' %>"
+  data-has-gender="<%= currentUser?.profile?.gender ? '1' : '0' %>"
+  data-has-occupation="<%= currentUser?.profile?.occupation ? '1' : '0' %>"
+  data-interests-count="<%= (currentUser?.profile?.interests || []).length %>"
+>
 
           <!-- Name + meta + actions -->
           <div class="flex-1 min-w-0 text-center md:text-left">
             <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
-              <h1 class="text-3xl md:text-4xl font-bold truncate"><%= currentUser.username %></h1>
+              <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold truncate"><%= currentUser.username %></h1>
+
               <% if (currentUser?.profile?.age) { %>
                 <span class="badge badge-lg"><%= currentUser.profile.age %></span>
               <% } %>
-              <% if (currentUser?.isPremium) { %>
-                <span class="badge badge-secondary badge-lg">Premium</span>
+
+              <% /* SINGLE plan pill only — use helper, never show duplicates */ %>
+              <% const _plan = (typeof planOf === 'function') ? planOf(currentUser)
+                        : ((currentUser?.plan && currentUser.plan !== 'free') ? currentUser.plan
+                           : (currentUser?.isPremium ? 'premium' : 'free')); %>
+              <% if (_plan !== 'free') { %>
+                <span class="badge badge-secondary badge-lg capitalize"><%= _plan %></span>
               <% } %>
-              <!-- Boost status -->
+
+              <!-- Boost status (shown when active) -->
               <span id="boostBadge"
                     class="badge badge-primary badge-lg hidden"
                     data-expires="<%= currentUser?.boostExpiresAt ? new Date(currentUser.boostExpiresAt).toISOString() : '' %>">
@@ -52,12 +58,13 @@
             </div>
 
             <div class="mt-2 text-gray-500 flex flex-wrap items-center gap-2 justify-center md:justify-start">
-              <% if (currentUser?.profile?.location) { %>
-                <span class="badge badge-outline"><%= currentUser.profile.location %></span>
-              <% } %>
+              <% const locParts = [currentUser?.profile?.city, currentUser?.profile?.country].filter(Boolean); %>
+              <span class="badge badge-outline"><%= locParts.length ? locParts.join(', ') : 'Location not set' %></span>
+
               <% if (currentUser?.profile?.occupation) { %>
                 <span class="badge badge-outline"><%= currentUser.profile.occupation %></span>
               <% } %>
+
               <% if (Array.isArray(currentUser?.profile?.interests) && currentUser.profile.interests.length) { %>
                 <span class="badge badge-outline">Interests: <%= currentUser.profile.interests.join(', ') %></span>
               <% } %>
@@ -73,21 +80,22 @@
         </div>
 
         <!-- Quick stats + completion -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-          <div class="stats shadow w-full md:col-span-3">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mt-6">
+          <div class="stats shadow w-full lg:col-span-3 grid grid-cols-3">
             <div class="stat">
               <div class="stat-title">Likes Sent</div>
-              <div class="stat-value"><%= (currentUser?.likes?.length || 0) %></div>
+              <div class="stat-value text-base sm:text-2xl"><%= (currentUser?.likes?.length || 0) %></div>
             </div>
             <div class="stat">
               <div class="stat-title">Liked By</div>
-              <div class="stat-value"><%= (currentUser?.likedBy?.length || 0) %></div>
+              <div class="stat-value text-base sm:text-2xl"><%= (currentUser?.likedBy?.length || 0) %></div>
             </div>
             <div class="stat">
               <div class="stat-title">Matches</div>
-              <div class="stat-value"><%= (currentUser?.matches?.length || 0) %></div>
+              <div class="stat-value text-base sm:text-2xl"><%= (currentUser?.matches?.length || 0) %></div>
             </div>
           </div>
+
           <div class="card bg-base-100 shadow">
             <div class="card-body">
               <div class="flex items-center justify-between">
@@ -100,17 +108,12 @@
         </div>
       </section>
 
-      <!-- Tabs -->
-      <section class="mt-8 bg-base-200 rounded-2xl shadow-xl p-4 md:p-6">
-        <div role="tablist" class="tabs tabs-bordered">
-          <button role="tab" class="tab tab-active" data-tab="overview">Overview</button>
-          <button role="tab" class="tab" data-tab="edit">Edit Profile</button>
-        </div>
-
-        <!-- OVERVIEW -->
-        <div id="tab-overview" class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <!-- About + details -->
+      <!-- OVERVIEW (read-only, exhaustive) -->
+      <section class="mt-8 bg-base-200 rounded-2xl shadow-xl p-4 sm:p-5 md:p-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Left: About + Details + Personality + Prompts -->
           <div class="lg:col-span-2 space-y-6">
+            <!-- About -->
             <div class="card bg-base-100 shadow">
               <div class="card-body">
                 <h2 class="card-title">About me</h2>
@@ -120,79 +123,159 @@
               </div>
             </div>
 
+            <!-- My details -->
             <div class="card bg-base-100 shadow">
               <div class="card-body">
                 <h2 class="card-title">My details</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                  <% const details = [
-                    { label: 'Gender', value: currentUser?.profile?.gender },
-                    { label: 'Height', value: currentUser?.profile?.height },
-                    { label: 'Body Type', value: currentUser?.profile?.bodyType },
-                    { label: 'Hair Color', value: currentUser?.profile?.hairColor },
-                    { label: 'Eye Color', value: currentUser?.profile?.eyeColor },
-                    { label: 'Education', value: currentUser?.profile?.education },
-                    { label: 'Drinking', value: currentUser?.profile?.drinking },
-                    { label: 'Smoking', value: currentUser?.profile?.smoking },
-                    { label: 'Zodiac Sign', value: currentUser?.profile?.zodiacSign },
-                    { label: 'Pets', value: currentUser?.profile?.pets },
-                    { label: 'Religion', value: currentUser?.profile?.religion },
-                    { label: 'Politics', value: currentUser?.profile?.politics },
-                    { label: 'Kids', value: currentUser?.profile?.kids },
-                    { label: 'Looking For', value: currentUser?.profile?.lookingFor },
-                    { label: 'Relationship Goals', value: currentUser?.profile?.relationshipGoals },
-                    { label: 'Fav African Artists', value: currentUser?.profile?.favoriteAfricanArtists },
-                    { label: 'Cultural Traditions', value: currentUser?.profile?.culturalTraditions },
-                  ]; details.forEach(d => { %>
+                  <% const D = currentUser?.profile || {}; %>
+<% const langs =
+     (Array.isArray(D.languagesSpoken) && D.languagesSpoken.length)
+       ? D.languagesSpoken.join(', ')
+       : ((Array.isArray(D.languages) && D.languages.length) ? D.languages.join(', ') : ''); %>
+
+<% const details = [
+  { l:'Age', v:D.age },                                     // added to mirror profile.ejs
+  { l:'Gender', v:D.gender },
+  { l:'Country', v:D.country },
+  { l:'State/Province', v:D.stateProvince },
+  { l:'City', v:D.city },
+  { l:'Occupation', v:D.occupation },
+  { l:'Employment status', v:D.employmentStatus },
+  { l:'Education level', v:D.educationLevel },
+  { l:'Nationality', v:D.nationality },
+  { l:'Religion', v:D.religion },
+  { l:'Star sign', v:D.starSign },
+  { l:'Languages', v:langs },                               // now falls back to profile.languages
+  { l:'Drinks', v:D.drinks },                               // same label & order as profile.ejs “Basics”
+  { l:'Smokes', v:D.smokes },
+  { l:'Pets', v:(Array.isArray(D.pets)&&D.pets.length)?D.pets.join(', '):'' },
+  { l:'Body art', v:(Array.isArray(D.bodyArt)&&D.bodyArt.length)?D.bodyArt.join(', '):'' },
+  { l:'Looking for', v:(Array.isArray(D.relationshipLookingFor)&&D.relationshipLookingFor.length)?D.relationshipLookingFor.join(', '):'' },
+  { l:'Children', v:D.children },
+  { l:'Wants more children', v:D.wantsMoreChildren },
+  { l:'Interests', v:(Array.isArray(D.interests)&&D.interests.length)?D.interests.join(', '):'' },
+  { l:'Hobbies & Interests', v:(Array.isArray(D.hobbiesInterests)&&D.hobbiesInterests.length)?D.hobbiesInterests.join(', '):'' },
+].filter(x => x.v); %>
+
+
+                  <% if (details.length) { details.forEach(d => { %>
                     <div class="flex items-center gap-2">
-                      <span class="text-sm text-gray-500 w-40"><%= d.label %>:</span>
-                      <span class="font-medium"><%= d.value || 'Not specified' %></span>
+                      <span class="text-xs sm:text-sm text-gray-500 w-40 sm:w-44"><%= d.l %>:</span>
+                      <span class="text-sm sm:text-base font-medium"><%= d.v %></span>
                     </div>
-                  <% }); %>
+                  <% }) } else { %>
+                    <p class="text-sm text-gray-500 italic">No details added yet.</p>
+                  <% } %>
                 </div>
               </div>
             </div>
 
-            <!-- Prompts / answers (read-only showcase if available) -->
-            <% if (Array.isArray(currentUser?.profile?.prompts) && currentUser.profile.prompts.length) { %>
+            <!-- Personality -->
+            <div class="card bg-base-100 shadow">
+              <div class="card-body">
+                <h2 class="card-title">Personality</h2>
+                <% const P = currentUser?.profile || {}; %>
+                <% const personality = [
+                  { l:'Early bird / Night owl', v:P.earlyBirdNightOwl },
+                  { l:'Stress handling', v:P.stressHandling },
+                  { l:'Ideal weekend', v:P.idealWeekend },
+                  { l:'Humor importance', v:P.humorImportance },
+                  { l:'Planner / Spontaneous', v:P.plannerSpontaneous },
+                  { l:'Favorite music', v:P.favoriteMusic },
+                  { l:'Favorite book genre', v:P.favoriteBookGenre },
+                  { l:'Favorite movie genre', v:P.favoriteMovieGenre },
+                  { l:'Enjoy cooking', v:P.enjoyCooking },
+                  { l:'Travel importance', v:P.travelImportance },
+                  { l:'Stay active', v:P.stayActive },
+                  { l:'PDA comfort', v:P.pdaComfort },
+                  { l:'Communication style', v:P.communicationStyle },
+                  { l:'Disagreement handling', v:P.disagreementHandling },
+                  { l:'Love language', v:P.loveLanguage },
+                  { l:'Introvert / Extrovert', v:P.introvertExtrovert },
+                  { l:'Family importance', v:P.familyImportance },
+                  { l:'Ideal date', v:P.idealDate },
+                  { l:'Trying new things', v:P.tryingNewThings },
+                  { l:'Biggest pet peeve', v:P.biggestPetPeeve },
+                ].filter(x => !!x.v); %>
+
+                <% if (personality.length) { %>
+                  <div class="mt-2 grid sm:grid-cols-2 gap-2">
+                    <% personality.forEach((row) => { %>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs sm:text-sm text-gray-500 w-44"><%= row.l %>:</span>
+                        <span class="text-sm sm:text-base font-medium"><%= row.v %></span>
+                      </div>
+                    <% }) %>
+                  </div>
+                <% } else { %>
+                  <p class="text-sm text-gray-500 italic">No personality details yet.</p>
+                <% } %>
+              </div>
+            </div>
+
+            <!-- Prompts (top-level) -->
+            <div class="grid md:grid-cols-3 gap-4">
               <div class="card bg-base-100 shadow">
                 <div class="card-body">
-                  <h2 class="card-title">Conversation prompts</h2>
-                  <div class="mt-2 space-y-3">
-                    <% currentUser.profile.prompts.forEach((p) => { %>
-                      <div class="border border-base-300 rounded-xl p-3">
-                        <div class="text-sm text-gray-500"><%= p.q || 'Prompt' %></div>
-                        <div class="font-medium"><%= p.a || '' %></div>
-                      </div>
-                    <% }); %>
+                  <div class="text-xs opacity-70">Favorite African Artists</div>
+                  <div class="mt-2 text-sm leading-[1.55]">
+                    <%= currentUser?.favoriteAfricanArtists || '—' %>
                   </div>
                 </div>
               </div>
-            <% } %>
+              <div class="card bg-base-100 shadow">
+                <div class="card-body">
+                  <div class="text-xs opacity-70">Cultural Traditions</div>
+                  <div class="mt-2 text-sm leading-[1.55]">
+                    <%= currentUser?.culturalTraditions || '—' %>
+                  </div>
+                </div>
+              </div>
+              <div class="card bg-base-100 shadow">
+                <div class="card-body">
+                  <div class="text-xs opacity-70">Relationship Goals</div>
+                  <div class="mt-2 text-sm leading-[1.55]">
+                    <%= currentUser?.relationshipGoals || '—' %>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- Photos -->
+          <!-- Right: Photos + Activity -->
           <div class="space-y-6">
+            <!-- Photos -->
             <div class="card bg-base-100 shadow">
               <div class="card-body">
                 <h2 class="card-title">Photos</h2>
-                <% if (Array.isArray(currentUser?.profile?.photos) && currentUser.profile.photos.length) { %>
-                  <div class="grid grid-cols-2 gap-3 mt-2">
-                    <% currentUser.profile.photos.forEach((p) => { %>
-                      <img src="<%= p %>" alt="Photo" class="w-full h-28 object-cover rounded-xl shadow">
+                <% const photos = Array.isArray(currentUser?.profile?.photos) ? currentUser.profile.photos : []; %>
+                <% if (photos.length) { %>
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
+                    <% photos.forEach((p) => { %>
+                      <img src="<%= p %>" alt="Photo" class="w-full aspect-[4/5] object-cover rounded-xl shadow">
                     <% }); %>
                   </div>
                 <% } else { %>
                   <p class="text-sm text-gray-500 italic mt-2">No photos uploaded yet.</p>
                 <% } %>
+
+                <form action="/my-profile" method="post" enctype="multipart/form-data" class="mt-3 flex items-center gap-2">
+                  <input type="file" name="photos" multiple accept="image/*" class="file-input file-input-bordered file-input-sm w-full sm:w-auto">
+                  <button class="btn btn-sm btn-primary">Upload</button>
+                </form>
               </div>
             </div>
 
-            <!-- Streak / activity -->
+            <!-- Activity -->
             <div class="card bg-base-100 shadow">
               <div class="card-body">
                 <h2 class="card-title">Activity</h2>
                 <div class="flex items-center gap-3">
-                  <div class="radial-progress text-primary" id="streakRadial" style="--value:<%= Math.max(0, Math.min(100, ((Number(currentUser?.streakDay||0)/7)*100))) %>;" role="progressbar">
+                  <div class="radial-progress text-primary"
+                       id="streakRadial"
+                       style="--value:<%= Math.max(0, Math.min(100, ((Number(currentUser?.streakDay||0)/7)*100))) %>;"
+                       role="progressbar">
                     <%= Number(currentUser?.streakDay||0) %>/7
                   </div>
                   <div>
@@ -202,119 +285,15 @@
                 </div>
               </div>
             </div>
-
-          </div>
-        </div>
-
-        <!-- EDIT -->
-        <div id="tab-edit" class="hidden mt-6">
-          <form action="/my-profile" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left: basic info -->
-            <div class="lg:col-span-2 space-y-6">
-              <div class="card bg-base-100 shadow">
-                <div class="card-body">
-                  <h2 class="card-title">Basic info</h2>
-
-                  <div class="form-control">
-                    <label class="label"><span class="label-text">Bio</span></label>
-                    <textarea name="bio" class="textarea textarea-bordered" rows="4" placeholder="Tell us about yourself..."><%= currentUser?.profile?.bio || '' %></textarea>
-                  </div>
-
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="form-control">
-                      <label class="label"><span class="label-text">Age</span></label>
-                      <input type="number" name="age" class="input input-bordered" value="<%= currentUser?.profile?.age || '' %>" min="18" max="99" required>
-                    </div>
-                    <div class="form-control">
-                      <label class="label"><span class="label-text">Gender</span></label>
-                      <select name="gender" class="select select-bordered" required>
-                        <% const g = currentUser?.profile?.gender; %>
-                        <option value="Male" <%= g==='Male' ? 'selected' : '' %>>Male</option>
-                        <option value="Female" <%= g==='Female' ? 'selected' : '' %>>Female</option>
-                        <option value="Non-binary" <%= g==='Non-binary' ? 'selected' : '' %>>Non-binary</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="form-control">
-                      <label class="label"><span class="label-text">Occupation</span></label>
-                      <input type="text" name="occupation" class="input input-bordered" value="<%= currentUser?.profile?.occupation || '' %>">
-                    </div>
-                    <div class="form-control">
-                      <label class="label"><span class="label-text">Interests (comma separated)</span></label>
-                      <input type="text" name="interests" class="input input-bordered" value="<%= Array.isArray(currentUser?.profile?.interests) ? currentUser.profile.interests.join(', ') : '' %>">
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="card bg-base-100 shadow">
-                <div class="card-body">
-                  <h2 class="card-title">Cultural & personal</h2>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="form-control">
-                      <label class="label"><span class="label-text">Favorite African Artists</span></label>
-                      <input type="text" name="favoriteAfricanArtists" class="input input-bordered"
-                             value="<%= currentUser?.profile?.favoriteAfricanArtists || '' %>" placeholder="e.g., Burna Boy, Sauti Sol, Tems">
-                    </div>
-                    <div class="form-control">
-                      <label class="label"><span class="label-text">Cultural Traditions</span></label>
-                      <input type="text" name="culturalTraditions" class="input input-bordered"
-                             value="<%= currentUser?.profile?.culturalTraditions || '' %>" placeholder="e.g., Ancestor's Day">
-                    </div>
-                    <div class="form-control md:col-span-2">
-                      <label class="label"><span class="label-text">Relationship Goals</span></label>
-                      <input type="text" name="relationshipGoals" class="input input-bordered"
-                             value="<%= currentUser?.profile?.relationshipGoals || '' %>" placeholder="e.g., Long-term partner">
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right: photos & location -->
-            <div class="space-y-6">
-              <div class="card bg-base-100 shadow">
-                <div class="card-body">
-                  <h2 class="card-title">Profile photos</h2>
-                  <p class="text-xs text-gray-500">Click a tile to select an image. JPG/PNG/WebP.</p>
-                  <div class="grid grid-cols-2 gap-3 mt-2">
-                    <% for (let i=0; i<4; i++) { const src = currentUser?.profile?.photos?.[i] || '/images/placeholder.png'; %>
-                      <label class="block relative cursor-pointer group">
-                        <img src="<%= src %>" alt="Photo <%= i+1 %>" class="w-full h-28 object-cover rounded-xl border border-base-300 preview-img">
-                        <input type="file" name="photos" accept="image/*" class="absolute inset-0 opacity-0 file-input file-input-bordered">
-                        <span class="absolute bottom-2 right-2 badge badge-primary opacity-0 group-hover:opacity-100 transition">Change</span>
-                      </label>
-                    <% } %>
-                  </div>
-                </div>
-              </div>
-
-              <div class="card bg-base-100 shadow">
-                <div class="card-body">
-                  <h2 class="card-title">Location</h2>
-                  <p class="text-sm text-gray-500">Use your browser to verify and save your coordinates for distance on cards.</p>
-                  <div class="mt-2">
-                    <button id="setLocationBtnBottom" class="btn btn-outline w-full">Use my location</button>
-                  </div>
-                </div>
-              </div>
-
-              <button type="submit" class="btn btn-primary w-full">Save changes</button>
-            </div>
-          </form>
-        </div>
+          </div><!-- /right -->
+        </div><!-- /grid -->
       </section>
     </main>
 
-    <!-- Toasts -->
-    <div id="toasts" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
-
     <%- include('partials/footer.ejs') %>
 
-    <!-- External scripts (CSP-safe) -->
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/profile.js" defer></script>
+    <!-- Page script (optional helpers) -->
+    <script nonce="<%= cspNonce || '' %>" src="/js/profile.js" defer></script>
+    <script src="/js/my-profile.js" defer></script>
   </body>
 </html>
