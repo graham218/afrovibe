@@ -80,3 +80,13 @@ window.addEventListener('error', (e) => {
     init();
   }
 })();
+// /public/js/global-avatar-fallback.js
+(function(){
+  document.addEventListener('error', (e) => {
+    const t = e.target;
+    if (t && t.tagName === 'IMG' && t.dataset && t.dataset.fallback) {
+      if (t.src !== t.dataset.fallback) t.src = t.dataset.fallback;
+    }
+  }, true);
+})();
+

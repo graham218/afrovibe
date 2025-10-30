@@ -59,10 +59,11 @@
 
   <!-- Clear chat (fix keeps as-is; wired by JS) -->
   <button id="clearThreadBtn"
-          class="btn btn-sm btn-outline"
-          data-other-id="<%= (peer && peer._id) ? String(peer._id) : (otherUser && otherUser._id) ? String(otherUser._id) : '' %>">
-    🗑 Clear
-  </button>
+        class="btn btn-sm btn-outline"
+        data-other-id="<%= String(otherUser?._id || peer?._id || '') %>">
+  🗑 Clear
+</button>
+
 </div>
 
       </div>
@@ -75,26 +76,38 @@
                  || [];
     %>
     <div id="chatScroll" class="card bg-base-100 border shadow p-3 space-y-2 max-h-[70vh] md:max-h-[72vh] overflow-y-auto">
-      <% _msgs.forEach(function(m){ const mine = String(m.sender) === String(currentUser._id); %>
-        <div class="flex <%= mine ? 'justify-end' : 'justify-start' %>">
-          <div class="max-w-[85%] md:max-w-[75%] rounded-2xl px-3 py-2 <%= mine ? 'bg-primary text-white' : 'bg-gray-100' %>"
-               data-id="<%= m._id %>"
-               data-ts="<%= new Date(m.createdAt || Date.now()).getTime() %>"
-               data-mine="<%= mine ? '1' : '0' %>">
-            <input type="checkbox" class="checkbox checkbox-xs chk hidden mr-2">
-            <div class="whitespace-pre-wrap break-words text-sm"><%= m.content %></div>
-            <div class="text-[10px] opacity-70 mt-1">
-              <%= new Date(m.createdAt || Date.now()).toLocaleString() %>
-              <%= mine ? '<span class="delivery">✓</span>' : '' %>
-            </div>
-          </div>
+
+  <% 
+    // Use a single list from the server
+    const list = (Array.isArray(initialHistory) && initialHistory.length)
+      ? initialHistory
+      : (Array.isArray(messages) ? messages : []);
+  %>
+
+  <% list.forEach(function(m){ 
+       const mine   = String(m.sender) === String(currentUser._id);
+       const date   = m.createdAt ? new Date(m.createdAt) : new Date();
+       const iso    = date.toISOString();
+       const pretty = date.toLocaleString(); // fallback display
+  %>
+    <div class="flex <%= mine ? 'justify-end' : 'justify-start' %>">
+      <div class="max-w-[85%] md:max-w-[75%] rounded-2xl px-3 py-2 <%= mine ? 'bg-primary text-white' : 'bg-gray-100' %>"
+           data-id="<%= m._id %>"
+           data-mine="<%= mine ? '1' : '0' %>">
+        <div class="whitespace-pre-wrap break-words text-sm"><%= m.content %></div>
+        <div class="text-[10px] opacity-70 mt-1">
+          <span class="msg-time" data-ts="<%= iso %>"><%= pretty %></span>
+          <% if (mine) { %><span class="delivery ml-1">✓</span><% } %>
         </div>
-      <% }); %>
+      </div>
     </div>
+  <% }); %>
+</div>
+
 
     <!-- Composer -->
     <% if (typeof isMatched === 'undefined' || isMatched) { %>
-      <form id="chatForm" class="sticky bottom-0 mt-3 flex gap-2" action="/api/messages" method="post" onsubmit="return false;">
+      <form id="chatForm" class="sticky bottom-0 mt-3 flex gap-2" action="/api/messages" method="post">
         <input id="chatInput" name="content" class="input input-bordered flex-1" placeholder="Type a message…">
         <button class="btn btn-primary">Send</button>
       </form>
@@ -116,47 +129,52 @@
   </main>
 
   <!-- RTC modal -->
-  <dialog id="rtc-modal" class="modal">
-    <div class="modal-box p-0 max-w-4xl">
-      <div class="flex items-center justify-between px-4 py-3 border-b bg-base-100">
-        <div class="flex items-center gap-2">
-          <span class="font-semibold">Video chat</span>
-          <span id="rtc-status" class="text-xs opacity-70">Connecting…</span>
-        </div>
-        <div class="flex gap-2">
-          <button class="btn btn-outline btn-xs rtc-mute"  type="button">Mute</button>
-          <button class="btn btn-outline btn-xs rtc-video" type="button">Video</button>
-          <button class="btn btn-error   btn-xs rtc-hangup" type="button">End</button>
-        </div>
+  <!-- RTC modal (keep this near end of <body>) -->
+<dialog id="rtc-modal" class="modal z-[9999]">
+  <div class="modal-box p-0 max-w-4xl">
+    <div class="flex items-center justify-between px-4 py-3 border-b bg-base-100">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">Video chat</span>
+        <span id="rtc-status" class="text-xs opacity-70">Connecting…</span>
       </div>
-
-      <div class="grid md:grid-cols-[1fr_auto] gap-2 p-3 bg-base-200">
-        <video id="rtc-remote" playsinline autoplay class="w-full aspect-video rounded bg-black"></video>
-        <video id="rtc-local"  playsinline autoplay muted class="w-40 h-28 md:w-48 md:h-36 rounded bg-black self-end shadow"></video>
+      <div class="flex gap-2">
+        <button class="btn btn-outline btn-xs rtc-mute"  type="button">Mute</button>
+        <button class="btn btn-outline btn-xs rtc-video" type="button">Video</button>
+        <button class="btn btn-error   btn-xs rtc-hangup" type="button">End</button>
       </div>
+    </div>
 
-      <div id="rtc-incoming" class="p-4 hidden">
-        <div class="card bg-base-100 border">
-          <div class="card-body p-4 flex items-center justify-between">
-            <div>
-              <div class="font-semibold">Incoming call</div>
-              <div class="text-xs opacity-70" id="rtc-from-label"></div>
-            </div>
-            <div class="flex gap-2">
-              <button class="btn btn-success btn-sm rtc-accept" type="button">Accept</button>
-              <button class="btn btn-ghost   btn-sm rtc-decline" type="button">Decline</button>
-            </div>
+    <div class="grid md:grid-cols-[1fr_auto] gap-2 p-3 bg-base-200">
+      <video id="rtc-remote" playsinline autoplay class="w-full aspect-video rounded bg-black"></video>
+      <video id="rtc-local"  playsinline autoplay muted class="w-40 h-28 md:w-48 md:h-36 rounded bg-black self-end shadow"></video>
+    </div>
+
+    <div id="rtc-incoming" class="p-4 hidden">
+      <div class="card bg-base-100 border">
+        <div class="card-body p-4 flex items-center justify-between">
+          <div>
+            <div class="font-semibold">Incoming call</div>
+            <div class="text-xs opacity-70" id="rtc-from-label"></div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-success btn-sm rtc-accept" type="button">Accept</button>
+            <button class="btn btn-ghost   btn-sm rtc-decline" type="button">Decline</button>
           </div>
         </div>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop"><button>close</button></form>
-  </dialog>
+  </div>
+
+  <!-- backdrop (DaisyUI) -->
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 
 <!-- load from the same origin the page was served from -->
-<script nonce="<%= cspNonce %>" src="/js/socket.helper.js" defer></script>
-<script nonce="<%= cspNonce %>" src="/js/global.js" defer></script>
-<script nonce="<%= cspNonce %>" src="/js/page-chat.js" defer></script>
+ <script src="/socket.io/socket.io.js" defer></script>
+<script src="/js/socket.helper.js" defer></script>
+<script src="/js/global.js" defer></script>
+<script src="/js/page-chat.js" defer></script>
 
 
   <%- include('partials/footer.ejs') %>

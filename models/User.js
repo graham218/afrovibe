@@ -43,7 +43,7 @@ const UserProfileSchema = new Schema(
 );
 
 /* -------------------------------- Main User schema -------------------------------- */
-const userSchema = new Schema({
+const userSchema = new mongoose.Schema({
   // Auth
   username: { type: String, required: true, unique: true, trim: true },
   email:    { type: String, required: true, unique: true, trim: true, lowercase: true },
@@ -122,6 +122,13 @@ const userSchema = new Schema({
   lastActive: { type: Date, default: Date.now },
   createdAt:  { type: Date, default: Date.now },
   updatedAt:  { type: Date, default: Date.now },
+
+  // ---- Account lifecycle flags (used by isActiveUserQuery) ----
+  active:        { type: Boolean, default: true },   // treat false as hidden
+  isDeleted:     { type: Boolean, default: false },  // soft delete flag
+  isDeactivated: { type: Boolean, default: false },  // user-initiated pause
+  deletedAt:     { type: Date, default: null },      // when soft-deleted
+
 });
 
 /* ------------------------------ Indexes (safe to sync) ------------------------------ */
@@ -131,6 +138,8 @@ userSchema.index({ lastActive: -1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ verifiedAt: 1 });
 userSchema.index({ emailVerifiedAt: 1 });
+// In your User schema definition file:
+userSchema.index({ isDeleted: 1, isDeactivated: 1, active: 1, deletedAt: 1 });
 
 // Search & geo
 userSchema.index({ 'profile.age': 1 });
@@ -160,4 +169,4 @@ userSchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);

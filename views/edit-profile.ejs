@@ -1,282 +1,241 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="afrovibe">
-  <%- include('partials/head.ejs', { pageTitle: 'My Profile' }) %>
+  <%- include('partials/head.ejs', { pageTitle: 'Edit Profile' }) %>
   <body class="bg-base-100 min-h-screen flex flex-col">
     <%- include('partials/navbar.ejs') %>
 
-    <main class="container mx-auto p-4 md:p-8 flex-grow">
-      <!-- Masthead -->
-      <section class="bg-base-200 rounded-2xl shadow-xl p-6 md:p-8">
-        <div class="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
-          <!-- Avatar -->
-          <div class="relative">
-            <div class="avatar">
-              <div class="w-40 h-40 md:w-52 md:h-52 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2 shadow">
-                <img
-                  src="<%= currentUser?.profile?.photos?.[0] || '/images/default-avatar.png' %>"
-                  alt="<%= currentUser.username %> avatar" />
-              </div>
-            </div>
+    <main class="container mx-auto px-4 sm:px-6 md:px-8 py-6 flex-1">
+      <header class="mb-5">
+        <h1 class="text-2xl md:text-3xl font-bold">Edit profile</h1>
+        <p class="text-sm opacity-70">Update your details. Changes appear on your public profile.</p>
+      </header>
 
-            <% /* Verified pill */ %>
-            <% if (currentUser?.verifiedAt) { %>
-              <div class="badge badge-success absolute -bottom-2 left-1/2 -translate-x-1/2">Verified</div>
-            <% } %>
+      <form action="/edit-profile" method="post" class="space-y-6">
+        <!-- Basics -->
+        <section class="card bg-base-100 shadow">
+          <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h2 class="card-title md:col-span-2">Basics</h2>
 
-            <% /* Plan pill: free/premium/elite via helper, no direct isPremium checks */ %>
-            <% const __plan = (typeof planOf === 'function') ? planOf(currentUser) : ((currentUser?.plan && currentUser.plan !== 'free') ? currentUser.plan : (currentUser?.isPremium ? 'premium' : 'free')); %>
-            <% if (__plan !== 'free') { %>
-              <span class="badge badge-secondary badge-lg absolute -top-2 -right-2 capitalize">
-                <%= __plan === 'elite' ? 'Elite' : 'Premium' %>
-              </span>
-            <% } %>
+            <label class="form-control">
+              <span class="label-text">Username</span>
+              <input name="username" class="input input-bordered" value="<%- currentUser?.username || '' %>" required>
+            </label>
+
+            <label class="form-control">
+              <span class="label-text">Age</span>
+              <input name="age" type="number" min="18" max="100" class="input input-bordered" value="<%- currentUser?.profile?.age || '' %>">
+            </label>
+
+            <label class="form-control">
+              <span class="label-text">Gender</span>
+              <input name="gender" class="input input-bordered" value="<%- currentUser?.profile?.gender || '' %>">
+            </label>
+
+            <label class="form-control md:col-span-2">
+              <span class="label-text">Bio</span>
+              <textarea name="bio" rows="4" class="textarea textarea-bordered"><%- currentUser?.profile?.bio || '' %></textarea>
+            </label>
           </div>
+        </section>
 
-          <!-- Name + meta + actions -->
-          <div class="flex-1 min-w-0 text-center md:text-left">
-            <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
-              <h1 class="text-3xl md:text-4xl font-bold truncate"><%= currentUser.username %></h1>
-              <% if (currentUser?.profile?.age) { %>
-                <span class="badge badge-lg"><%= currentUser.profile.age %></span>
-              <% } %>
-              <% if (__plan !== 'free') { %>
-                <span class="badge badge-secondary badge-lg capitalize"><%= __plan %></span>
-              <% } %>
-              <!-- Boost status -->
-              <span id="boostBadge"
-                    class="badge badge-primary badge-lg hidden"
-                    data-expires="<%= currentUser?.boostExpiresAt ? new Date(currentUser.boostExpiresAt).toISOString() : '' %>">
-                Boost active • <span id="boostCountdown">00:00</span>
-              </span>
-            </div>
+        <!-- Location -->
+        <section class="card bg-base-100 shadow">
+          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h2 class="card-title md:col-span-3">Location</h2>
 
-            <div class="mt-2 text-gray-500 flex flex-wrap items-center gap-2 justify-center md:justify-start">
-              <% const locParts = [currentUser?.profile?.city, currentUser?.profile?.country].filter(Boolean); %>
-              <span class="badge badge-outline"><%= locParts.length ? locParts.join(', ') : 'Location not set' %></span>
-
-              <% if (currentUser?.profile?.occupation) { %>
-                <span class="badge badge-outline"><%= currentUser.profile.occupation %></span>
-              <% } %>
-
-              <% if (Array.isArray(currentUser?.profile?.interests) && currentUser.profile.interests.length) { %>
-                <span class="badge badge-outline">Interests: <%= currentUser.profile.interests.join(', ') %></span>
-              <% } %>
-            </div>
-
-            <div class="mt-4 flex flex-wrap gap-2 justify-center md:justify-start">
-              <a href="/settings" class="btn btn-ghost btn-sm">Settings</a>
-              <button id="setLocationBtn" class="btn btn-outline btn-sm">Use my location</button>
-              <button id="boostBtn" class="btn btn-primary btn-sm">Boost profile</button>
-              <button id="copyLinkBtn" class="btn btn-ghost btn-sm">Copy profile link</button>
-            </div>
+            <label class="form-control">
+              <span class="label-text">Country</span>
+              <input name="country" class="input input-bordered" value="<%- currentUser?.profile?.country || '' %>">
+            </label>
+            <label class="form-control">
+              <span class="label-text">State/Province</span>
+              <input name="stateProvince" class="input input-bordered" value="<%- currentUser?.profile?.stateProvince || '' %>">
+            </label>
+            <label class="form-control">
+              <span class="label-text">City</span>
+              <input name="city" class="input input-bordered" value="<%- currentUser?.profile?.city || '' %>">
+            </label>
           </div>
-        </div>
+        </section>
 
-        <!-- Quick stats + completion -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-          <div class="stats shadow w-full md:col-span-3">
-            <div class="stat">
-              <div class="stat-title">Likes Sent</div>
-              <div class="stat-value"><%= (currentUser?.likes?.length || 0) %></div>
-            </div>
-            <div class="stat">
-              <div class="stat-title">Liked By</div>
-              <div class="stat-value"><%= (currentUser?.likedBy?.length || 0) %></div>
-            </div>
-            <div class="stat">
-              <div class="stat-title">Matches</div>
-              <div class="stat-value"><%= (currentUser?.matches?.length || 0) %></div>
-            </div>
-          </div>
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <div class="flex items-center justify-between">
-                <h3 class="card-title text-sm">Profile completion</h3>
-                <span id="completionPct" class="text-sm font-semibold">0%</span>
-              </div>
-              <progress id="completionBar" class="progress progress-primary w-full" value="0" max="100"></progress>
-            </div>
-          </div>
-        </div>
-      </section>
+        <!-- Work & Education -->
+        <section class="card bg-base-100 shadow">
+          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h2 class="card-title md:col-span-3">Work & education</h2>
 
-      <!-- OVERVIEW (read-only, but exhaustive) -->
-      <section class="mt-8 bg-base-200 rounded-2xl shadow-xl p-4 md:p-6">
-        <!-- 1) About -->
-        <div class="card bg-base-100 shadow mb-6">
+            <label class="form-control">
+              <span class="label-text">Occupation</span>
+              <input name="occupation" class="input input-bordered" value="<%- currentUser?.profile?.occupation || '' %>">
+            </label>
+            <label class="form-control">
+              <span class="label-text">Employment status</span>
+              <input name="employmentStatus" class="input input-bordered" value="<%- currentUser?.profile?.employmentStatus || '' %>">
+            </label>
+            <label class="form-control">
+              <span class="label-text">Education level</span>
+              <input name="educationLevel" class="input input-bordered" value="<%- currentUser?.profile?.educationLevel || '' %>">
+            </label>
+          </div>
+        </section>
+
+        <!-- Background -->
+        <section class="card bg-base-100 shadow">
+          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h2 class="card-title md:col-span-3">Background</h2>
+
+            <label class="form-control">
+              <span class="label-text">Nationality</span>
+              <input name="nationality" class="input input-bordered" value="<%- currentUser?.profile?.nationality || '' %>">
+            </label>
+            <label class="form-control">
+              <span class="label-text">Religion</span>
+              <input name="religion" class="input input-bordered" value="<%- currentUser?.profile?.religion || '' %>">
+            </label>
+            <label class="form-control">
+              <span class="label-text">Star sign</span>
+              <input name="starSign" class="input input-bordered" value="<%- currentUser?.profile?.starSign || '' %>">
+            </label>
+
+            <label class="form-control md:col-span-3">
+              <span class="label-text">Languages (comma separated)</span>
+              <input name="languagesSpoken" class="input input-bordered"
+                     value="<%- (currentUser?.profile?.languagesSpoken || currentUser?.profile?.languages || []).join(', ') %>">
+            </label>
+          </div>
+        </section>
+
+        <!-- Lifestyle -->
+        <section class="card bg-base-100 shadow">
+          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h2 class="card-title md:col-span-3">Lifestyle</h2>
+
+            <label class="form-control">
+              <span class="label-text">Drinks</span>
+              <input name="drinks" class="input input-bordered" value="<%- currentUser?.profile?.drinks || '' %>">
+            </label>
+            <label class="form-control">
+              <span class="label-text">Smokes</span>
+              <input name="smokes" class="input input-bordered" value="<%- currentUser?.profile?.smokes || '' %>">
+            </label>
+            <label class="form-control">
+              <span class="label-text">Pets (comma separated)</span>
+              <input name="pets" class="input input-bordered" value="<%- (currentUser?.profile?.pets || []).join(', ') %>">
+            </label>
+
+            <label class="form-control md:col-span-3">
+              <span class="label-text">Body art (comma separated)</span>
+              <input name="bodyArt" class="input input-bordered" value="<%- (currentUser?.profile?.bodyArt || []).join(', ') %>">
+            </label>
+          </div>
+        </section>
+
+        <!-- Relationship & family -->
+        <section class="card bg-base-100 shadow">
+          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h2 class="card-title md:col-span-3">Relationship & family</h2>
+
+            <label class="form-control md:col-span-3">
+              <span class="label-text">Looking for (comma separated)</span>
+              <input name="relationshipLookingFor" class="input input-bordered"
+                     value="<%- (currentUser?.profile?.relationshipLookingFor || []).join(', ') %>">
+            </label>
+
+            <label class="form-control">
+              <span class="label-text">Children</span>
+              <input name="children" class="input input-bordered" value="<%- currentUser?.profile?.children || '' %>">
+            </label>
+            <label class="form-control">
+              <span class="label-text">Wants more children</span>
+              <input name="wantsMoreChildren" class="input input-bordered" value="<%- currentUser?.profile?.wantsMoreChildren || '' %>">
+            </label>
+          </div>
+        </section>
+
+        <!-- Interests -->
+        <section class="card bg-base-100 shadow">
           <div class="card-body">
-            <h2 class="card-title">About me</h2>
-            <p class="mt-2 leading-relaxed">
-              <%= (currentUser?.profile?.bio && currentUser.profile.bio.trim()) || 'No bio provided yet.' %>
-            </p>
+            <h2 class="card-title">Interests</h2>
+            <label class="form-control">
+              <span class="label-text">Interests (comma separated)</span>
+              <input name="interests" class="input input-bordered"
+                     value="<%- (currentUser?.profile?.interests || []).join(', ') %>">
+            </label>
+
+            <label class="form-control mt-3">
+              <span class="label-text">Hobbies & Interests (comma separated)</span>
+              <input name="hobbiesInterests" class="input input-bordered"
+                     value="<%- (currentUser?.profile?.hobbiesInterests || []).join(', ') %>">
+            </label>
           </div>
+        </section>
+
+        <!-- Personality (single-select/short-texts) -->
+        <section class="card bg-base-100 shadow">
+          <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h2 class="card-title md:col-span-2">Personality</h2>
+            <% const P = currentUser?.profile || {}; %>
+            <% const rows = [
+              ['earlyBirdNightOwl', 'Early bird / Night owl'],
+              ['stressHandling', 'Stress handling'],
+              ['idealWeekend', 'Ideal weekend'],
+              ['humorImportance', 'Humor importance'],
+              ['plannerSpontaneous', 'Planner / Spontaneous'],
+              ['favoriteMusic', 'Favorite music'],
+              ['favoriteBookGenre', 'Favorite book genre'],
+              ['favoriteMovieGenre', 'Favorite movie genre'],
+              ['enjoyCooking', 'Enjoy cooking'],
+              ['travelImportance', 'Travel importance'],
+              ['stayActive', 'Stay active'],
+              ['pdaComfort', 'PDA comfort'],
+              ['communicationStyle', 'Communication style'],
+              ['disagreementHandling', 'Disagreement handling'],
+              ['loveLanguage', 'Love language'],
+              ['introvertExtrovert', 'Introvert / Extrovert'],
+              ['familyImportance', 'Family importance'],
+              ['idealDate', 'Ideal date'],
+              ['tryingNewThings', 'Trying new things'],
+              ['biggestPetPeeve', 'Biggest pet peeve'],
+            ]; %>
+
+            <% rows.forEach(([name, label]) => { %>
+              <label class="form-control">
+                <span class="label-text"><%= label %></span>
+                <input name="<%= name %>" class="input input-bordered" value="<%- P?.[name] || '' %>">
+              </label>
+            <% }) %>
+          </div>
+        </section>
+
+        <!-- Prompts (top-level) -->
+        <section class="card bg-base-100 shadow">
+          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h2 class="card-title md:col-span-3">Prompts</h2>
+
+            <label class="form-control">
+              <span class="label-text">Favorite African Artists</span>
+              <textarea name="favoriteAfricanArtists" rows="3" class="textarea textarea-bordered"><%- currentUser?.favoriteAfricanArtists || '' %></textarea>
+            </label>
+
+            <label class="form-control">
+              <span class="label-text">Cultural Traditions</span>
+              <textarea name="culturalTraditions" rows="3" class="textarea textarea-bordered"><%- currentUser?.culturalTraditions || '' %></textarea>
+            </label>
+
+            <label class="form-control md:col-span-1">
+              <span class="label-text">Relationship Goals</span>
+              <textarea name="relationshipGoals" rows="3" class="textarea textarea-bordered"><%- currentUser?.relationshipGoals || '' %></textarea>
+            </label>
+          </div>
+        </section>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-2 justify-end">
+          <a href="/my-profile" class="btn btn-ghost">Cancel</a>
+          <button class="btn btn-primary">Save changes</button>
         </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <!-- 2) My details (everything saved from /edit-profile) -->
-          <div class="lg:col-span-2 space-y-6">
-            <div class="card bg-base-100 shadow">
-              <div class="card-body">
-                <h2 class="card-title">My details</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                  <% const D = currentUser?.profile || {}; %>
-                  <% const details = [
-                    { label:'Gender',                value: D.gender },
-                    { label:'Country',               value: D.country },
-                    { label:'State/Province',        value: D.stateProvince },
-                    { label:'City',                  value: D.city },
-                    { label:'Occupation',            value: D.occupation },
-                    { label:'Employment status',     value: D.employmentStatus },
-                    { label:'Education level',       value: D.educationLevel },
-                    { label:'Nationality',           value: D.nationality },
-                    { label:'Religion',              value: D.religion },
-                    { label:'Star sign',             value: D.starSign },
-                    { label:'Languages',             value: (Array.isArray(D.languagesSpoken) && D.languagesSpoken.length) ? D.languagesSpoken.join(', ') : '' },
-
-                    { label:'Drinks',                value: D.drinks },
-                    { label:'Smokes',                value: D.smokes },
-                    { label:'Pets',                  value: (Array.isArray(D.pets) && D.pets.length) ? D.pets.join(', ') : '' },
-                    { label:'Body art',              value: (Array.isArray(D.bodyArt) && D.bodyArt.length) ? D.bodyArt.join(', ') : '' },
-
-                    { label:'Looking for',           value: (Array.isArray(D.relationshipLookingFor) && D.relationshipLookingFor.length) ? D.relationshipLookingFor.join(', ') : '' },
-                    { label:'Children',              value: D.children },
-                    { label:'Wants more children',   value: D.wantsMoreChildren },
-
-                    { label:'Interests',             value: (Array.isArray(D.interests) && D.interests.length) ? D.interests.join(', ') : '' },
-                    { label:'Hobbies & Interests',   value: (Array.isArray(D.hobbiesInterests) && D.hobbiesInterests.length) ? D.hobbiesInterests.join(', ') : '' },
-                  ]; details.forEach(d => { %>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-gray-500 w-44"><%= d.label %>:</span>
-                      <span class="font-medium"><%= d.value || 'Not specified' %></span>
-                    </div>
-                  <% }); %>
-                </div>
-              </div>
-            </div>
-
-            <!-- 3) Personality (read-only mirror of edit-profile) -->
-            <div class="card bg-base-100 shadow">
-              <div class="card-body">
-                <h2 class="card-title">Personality</h2>
-                <% const P = currentUser?.profile || {}; %>
-                <% const personality = [
-                  { l:'Early bird / Night owl', v:P.earlyBirdNightOwl },
-                  { l:'Stress handling',        v:P.stressHandling },
-                  { l:'Ideal weekend',          v:P.idealWeekend },
-                  { l:'Humor importance',       v:P.humorImportance },
-                  { l:'Planner / Spontaneous',  v:P.plannerSpontaneous },
-                  { l:'Favorite music',         v:P.favoriteMusic },
-                  { l:'Favorite book genre',    v:P.favoriteBookGenre },
-                  { l:'Favorite movie genre',   v:P.favoriteMovieGenre },
-                  { l:'Enjoy cooking',          v:P.enjoyCooking },
-                  { l:'Travel importance',      v:P.travelImportance },
-                  { l:'Stay active',            v:P.stayActive },
-                  { l:'PDA comfort',            v:P.pdaComfort },
-                  { l:'Communication style',    v:P.communicationStyle },
-                  { l:'Disagreement handling',  v:P.disagreementHandling },
-                  { l:'Love language',          v:P.loveLanguage },
-                  { l:'Introvert / Extrovert',  v:P.introvertExtrovert },
-                  { l:'Family importance',      v:P.familyImportance },
-                  { l:'Ideal date',             v:P.idealDate },
-                  { l:'Trying new things',      v:P.tryingNewThings },
-                  { l:'Biggest pet peeve',      v:P.biggestPetPeeve },
-                ].filter(x => !!x.v); %>
-
-                <% if (personality.length) { %>
-                  <div class="mt-2 grid md:grid-cols-2 gap-2">
-                    <% personality.forEach((row) => { %>
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm text-gray-500 w-48"><%= row.l %>:</span>
-                        <span class="font-medium"><%= row.v %></span>
-                      </div>
-                    <% }) %>
-                  </div>
-                <% } else { %>
-                  <p class="text-sm text-gray-500 mt-2 italic">No personality details yet.</p>
-                <% } %>
-              </div>
-            </div>
-
-            <!-- 4) Prompts (top-level fields, aligned with routes) -->
-            <% if (currentUser?.favoriteAfricanArtists || currentUser?.culturalTraditions || currentUser?.relationshipGoals) { %>
-              <div class="grid md:grid-cols-3 gap-4">
-                <% if (currentUser?.favoriteAfricanArtists) { %>
-                  <div class="card bg-base-100 shadow">
-                    <div class="card-body">
-                      <div class="text-xs opacity-70">Favorite African Artists</div>
-                      <div class="mt-2 text-sm leading-[1.55]"><%= currentUser.favoriteAfricanArtists %></div>
-                    </div>
-                  </div>
-                <% } %>
-                <% if (currentUser?.culturalTraditions) { %>
-                  <div class="card bg-base-100 shadow">
-                    <div class="card-body">
-                      <div class="text-xs opacity-70">Cultural Traditions</div>
-                      <div class="mt-2 text-sm leading-[1.55]"><%= currentUser.culturalTraditions %></div>
-                    </div>
-                  </div>
-                <% } %>
-                <% if (currentUser?.relationshipGoals) { %>
-                  <div class="card bg-base-100 shadow">
-                    <div class="card-body">
-                      <div class="text-xs opacity-70">Relationship Goals</div>
-                      <div class="mt-2 text-sm leading-[1.55]"><%= currentUser.relationshipGoals %></div>
-                    </div>
-                  </div>
-                <% } %>
-              </div>
-            <% } else { %>
-              <div class="card bg-base-100 shadow">
-                <div class="card-body">
-                  <h2 class="card-title">Prompts</h2>
-                  <p class="text-sm text-gray-500 mt-2 italic">No prompts added yet.</p>
-                </div>
-              </div>
-            <% } %>
-          </div>
-
-          <!-- 5) Photos + 6) Activity (as you had) -->
-          <div class="space-y-6">
-            <div class="card bg-base-100 shadow">
-              <div class="card-body">
-                <h2 class="card-title">Photos</h2>
-                <% if (Array.isArray(currentUser?.profile?.photos) && currentUser.profile.photos.length) { %>
-                  <div class="grid grid-cols-2 gap-3 mt-2">
-                    <% currentUser.profile.photos.forEach((p) => { %>
-                      <img src="<%= p %>" alt="Photo" class="w-full aspect-[4/5] object-cover rounded-xl shadow">
-                    <% }); %>
-                  </div>
-                <% } else { %>
-                  <p class="text-sm text-gray-500 italic mt-2">No photos uploaded yet.</p>
-                <% } %>
-              </div>
-            </div>
-
-            <div class="card bg-base-100 shadow">
-              <div class="card-body">
-                <h2 class="card-title">Activity</h2>
-                <div class="flex items-center gap-3">
-                  <div class="radial-progress text-primary" id="streakRadial" style="--value:<%= Math.max(0, Math.min(100, ((Number(currentUser?.streakDay||0)/7)*100))) %>;" role="progressbar">
-                    <%= Number(currentUser?.streakDay||0) %>/7
-                  </div>
-                  <div>
-                    <div class="font-medium">Weekly streak</div>
-                    <div class="text-sm text-gray-500">Keep logging in daily to hit your 7-day streak.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div> <!-- /right column -->
-        </div> <!-- /grid -->
-      </section>
+      </form>
     </main>
 
-    <!-- Toasts -->
-    <div id="toasts" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
-
     <%- include('partials/footer.ejs') %>
-
-    <!-- Page scripts (no duplicate socket.io; head partial already loads it) -->
-    <script nonce="<%= cspNonce || '' %>" src="/js/profile.js" defer></script>
   </body>
 </html>

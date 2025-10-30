@@ -1,7 +1,15 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="afrovibe">
   <%- include('partials/head.ejs', { pageTitle: 'My Profile' }) %>
-  <body class="bg-base-100 min-h-screen flex flex-col">
+  <body
+    class="bg-base-100 min-h-screen flex flex-col"
+    data-me="<%= currentUser._id %>"
+    data-has-bio="<%= currentUser?.profile?.bio ? '1' : '0' %>"
+    data-has-age="<%= currentUser?.profile?.age ? '1' : '0' %>"
+    data-has-gender="<%= currentUser?.profile?.gender ? '1' : '0' %>"
+    data-has-occupation="<%= currentUser?.profile?.occupation ? '1' : '0' %>"
+    data-interests-count="<%= (currentUser?.profile?.interests || []).length %>"
+  >
     <%- include('partials/navbar.ejs') %>
 
     <main class="container mx-auto px-4 sm:px-5 md:px-8 py-5 flex-grow">
@@ -14,7 +22,9 @@
               <div class="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2 shadow">
                 <img
                   src="<%= currentUser?.profile?.photos?.[0] || '/images/default-avatar.png' %>"
+                  data-fallback="/images/default-avatar.png"
                   alt="<%= currentUser.username %> avatar" />
+
               </div>
             </div>
 
@@ -22,15 +32,6 @@
               <div class="badge badge-success absolute -bottom-2 left-1/2 -translate-x-1/2">Verified</div>
             <% } %>
           </div>
-          
-          <body
-  data-me="<%= currentUser._id %>"
-  data-has-bio="<%= currentUser?.profile?.bio ? '1' : '0' %>"
-  data-has-age="<%= currentUser?.profile?.age ? '1' : '0' %>"
-  data-has-gender="<%= currentUser?.profile?.gender ? '1' : '0' %>"
-  data-has-occupation="<%= currentUser?.profile?.occupation ? '1' : '0' %>"
-  data-interests-count="<%= (currentUser?.profile?.interests || []).length %>"
->
 
           <!-- Name + meta + actions -->
           <div class="flex-1 min-w-0 text-center md:text-left">
@@ -41,7 +42,7 @@
                 <span class="badge badge-lg"><%= currentUser.profile.age %></span>
               <% } %>
 
-              <% /* SINGLE plan pill only — use helper, never show duplicates */ %>
+              <% /* SINGLE plan pill only */ %>
               <% const _plan = (typeof planOf === 'function') ? planOf(currentUser)
                         : ((currentUser?.plan && currentUser.plan !== 'free') ? currentUser.plan
                            : (currentUser?.isPremium ? 'premium' : 'free')); %>
@@ -129,35 +130,34 @@
                 <h2 class="card-title">My details</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                   <% const D = currentUser?.profile || {}; %>
-<% const langs =
-     (Array.isArray(D.languagesSpoken) && D.languagesSpoken.length)
-       ? D.languagesSpoken.join(', ')
-       : ((Array.isArray(D.languages) && D.languages.length) ? D.languages.join(', ') : ''); %>
+                  <% const langs =
+                       (Array.isArray(D.languagesSpoken) && D.languagesSpoken.length)
+                         ? D.languagesSpoken.join(', ')
+                         : ((Array.isArray(D.languages) && D.languages.length) ? D.languages.join(', ') : ''); %>
 
-<% const details = [
-  { l:'Age', v:D.age },                                     // added to mirror profile.ejs
-  { l:'Gender', v:D.gender },
-  { l:'Country', v:D.country },
-  { l:'State/Province', v:D.stateProvince },
-  { l:'City', v:D.city },
-  { l:'Occupation', v:D.occupation },
-  { l:'Employment status', v:D.employmentStatus },
-  { l:'Education level', v:D.educationLevel },
-  { l:'Nationality', v:D.nationality },
-  { l:'Religion', v:D.religion },
-  { l:'Star sign', v:D.starSign },
-  { l:'Languages', v:langs },                               // now falls back to profile.languages
-  { l:'Drinks', v:D.drinks },                               // same label & order as profile.ejs “Basics”
-  { l:'Smokes', v:D.smokes },
-  { l:'Pets', v:(Array.isArray(D.pets)&&D.pets.length)?D.pets.join(', '):'' },
-  { l:'Body art', v:(Array.isArray(D.bodyArt)&&D.bodyArt.length)?D.bodyArt.join(', '):'' },
-  { l:'Looking for', v:(Array.isArray(D.relationshipLookingFor)&&D.relationshipLookingFor.length)?D.relationshipLookingFor.join(', '):'' },
-  { l:'Children', v:D.children },
-  { l:'Wants more children', v:D.wantsMoreChildren },
-  { l:'Interests', v:(Array.isArray(D.interests)&&D.interests.length)?D.interests.join(', '):'' },
-  { l:'Hobbies & Interests', v:(Array.isArray(D.hobbiesInterests)&&D.hobbiesInterests.length)?D.hobbiesInterests.join(', '):'' },
-].filter(x => x.v); %>
-
+                  <% const details = [
+                    { l:'Age', v:D.age },
+                    { l:'Gender', v:D.gender },
+                    { l:'Country', v:D.country },
+                    { l:'State/Province', v:D.stateProvince },
+                    { l:'City', v:D.city },
+                    { l:'Occupation', v:D.occupation },
+                    { l:'Employment status', v:D.employmentStatus },
+                    { l:'Education level', v:D.educationLevel },
+                    { l:'Nationality', v:D.nationality },
+                    { l:'Religion', v:D.religion },
+                    { l:'Star sign', v:D.starSign },
+                    { l:'Languages', v:langs },
+                    { l:'Drinks', v:D.drinks },
+                    { l:'Smokes', v:D.smokes },
+                    { l:'Pets', v:(Array.isArray(D.pets)&&D.pets.length)?D.pets.join(', '):'' },
+                    { l:'Body art', v:(Array.isArray(D.bodyArt)&&D.bodyArt.length)?D.bodyArt.join(', '):'' },
+                    { l:'Looking for', v:(Array.isArray(D.relationshipLookingFor)&&D.relationshipLookingFor.length)?D.relationshipLookingFor.join(', '):'' },
+                    { l:'Children', v:D.children },
+                    { l:'Wants more children', v:D.wantsMoreChildren },
+                    { l:'Interests', v:(Array.isArray(D.interests)&&D.interests.length)?D.interests.join(', '):'' },
+                    { l:'Hobbies & Interests', v:(Array.isArray(D.hobbiesInterests)&&D.hobbiesInterests.length)?D.hobbiesInterests.join(', '):'' },
+                  ].filter(x => x.v); %>
 
                   <% if (details.length) { details.forEach(d => { %>
                     <div class="flex items-center gap-2">
@@ -292,8 +292,7 @@
 
     <%- include('partials/footer.ejs') %>
 
-    <!-- Page script (optional helpers) -->
-    <script nonce="<%= cspNonce || '' %>" src="/js/profile.js" defer></script>
+    <!-- Page script for my-profile (boost/location/completion) -->
     <script src="/js/my-profile.js" defer></script>
   </body>
 </html>

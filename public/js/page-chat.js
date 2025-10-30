@@ -1,540 +1,268 @@
-// public/js/page-chat.js (CLEANED)
-// Single-source-of-truth RTC state. No inner re-definitions. No double bindings.
-(function () {
-  // ---------- tiny utils ----------
-  const $  = (s, r=document) => r.querySelector(s);
-  const on = (el, ev, fn, opts) => el && el.addEventListener(ev, fn, opts);
-  const isMongoId = (s) => /^[a-f0-9]{24}$/i.test(String(s || '').trim());
+// public/js/page-chat.js
+(() => {
+  if (window.__pageChatInit) return;
+  window.__pageChatInit = true;
 
-  // always re-resolve the socket (do NOT capture once)
-  const getSocket = () => window.__appSocket || window.socket || null;
+  const $  = (s, r=document)=>r.querySelector(s);
+  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
 
-  async function waitForSocketConnected(sock, ms = 5000) {
-    if (!sock) return false;
-    if (sock.connected) return true;
-    return await new Promise((resolve) => {
-      const onConnect = () => { cleanup(); resolve(true); };
-      const t = setTimeout(() => { cleanup(); resolve(false); }, ms);
-      function cleanup() { sock.off('connect', onConnect); clearTimeout(t); }
-      sock.once('connect', onConnect);
+  function getIds() {
+    const me   = $('#currentUserId')?.value || document.body?.dataset?.me || '';
+    const peer = $('#otherUserId')?.value   || document.body?.dataset?.peerId || '';
+    return { me, peer };
+  }
+
+  function ensureSocket() {
+    if (window.__appSocket) return window.__appSocket;
+    if (typeof io !== 'function') return null;
+    window.__appSocket = io({
+      path: '/socket.io',
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 4000,
     });
+    try { window.dispatchEvent(new Event('socket:ready')); } catch {}
+    return window.__appSocket;
   }
 
-  // ---------- DOM refs ----------
-  const currentUserId = ($('#currentUserId')?.value || '').trim();
-  const otherUserId   = ($('#otherUserId')?.value   || '').trim();
-
-  const form      = $('#chatForm');
-  const input     = $('#chatInput');
-  const scrollBox = $('#chatScroll');
-  const typingDot = $('#typingDot');
-
-  const btnBlock  = $('#blockUser');
-  const btnReport = $('#reportUser');
-  const btnClear  = $('#clearThreadBtn');   // has data-other-id in EJS
-  const btnCall   = document.querySelector('.video-call-btn');
-
-  // ---------- Basic guards ----------
-  if (scrollBox) scrollBox.scrollTop = scrollBox.scrollHeight;
-  if (!isMongoId(otherUserId)) {
-    console.warn('[chat] invalid otherUserId, disabling composer');
-    if (input) input.disabled = true;
-    form?.querySelector('button')?.setAttribute('disabled', 'disabled');
+  // ---------- toast ----------
+  function toast(msg, kind='default') {
+    let wrap = $('#toast'); let inner = $('#toastInner');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'toast';
+      wrap.className = 'fixed left-1/2 -translate-x-1/2 bottom-6 z-50';
+      inner = document.createElement('div');
+      inner.id = 'toastInner';
+      inner.className = 'px-4 py-2 rounded-xl shadow-lg text-sm bg-neutral text-neutral-content';
+      wrap.appendChild(inner);
+      document.body.appendChild(wrap);
+    }
+    inner.textContent = msg;
+    inner.className =
+      'px-4 py-2 rounded-xl shadow-lg text-sm ' +
+      (kind === 'ok'    ? 'bg-emerald-600 text-white' :
+       kind === 'error' ? 'bg-red-600 text-white' :
+                          'bg-neutral text-neutral-content');
+    wrap.classList.remove('hidden');
+    clearTimeout(wrap._t); wrap._t = setTimeout(()=>wrap.classList.add('hidden'), 1700);
   }
 
-  // ---------- Chat UI helpers ----------
-  function appendBubble({ _id, sender, content, createdAt }) {
-    const mine = String(sender) === String(currentUserId);
+  // ---------- format date/time ----------
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function formatStamp(ts) {
+    const d = (ts instanceof Date) ? ts : new Date(ts);
+    if (!isFinite(d)) return '';
+    const now   = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    const t = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    if (sameDay) return t; // today -> time only
+    // else -> short date + time
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${t}`;
+  }
+
+  // ---------- video preview ----------
+  const dlg      = $('#rtc-modal');
+  const vLocal   = $('#rtc-local');
+  const statusEl = $('#rtc-status');
+
+  function setStatus(t) { if (statusEl) statusEl.textContent = t || ''; }
+  function openModal() { if (dlg) { try { dlg.showModal?.(); } catch {} dlg.setAttribute('open',''); dlg.style.display='block'; } }
+  function closeModal(){ if (dlg) { try { dlg.close?.(); } catch {} dlg.removeAttribute('open'); dlg.style.display=''; } }
+
+  let localStream = null;
+  async function startPreview() {
+    if (!vLocal) return;
+    vLocal.muted = true; vLocal.setAttribute('muted',''); vLocal.setAttribute('playsinline',''); vLocal.setAttribute('autoplay','');
+    setStatus('Requesting camera/mic…');
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+      vLocal.srcObject = localStream; try { await vLocal.play(); } catch {}
+      setStatus('Preview active');
+    } catch (err) {
+      console.warn('[rtc] getUserMedia failed', err);
+      setStatus(err?.name || 'Camera/mic blocked');
+      toast('Allow camera & mic. Close other apps using your camera.', 'error');
+    }
+  }
+  function stopPreview() {
+    try { localStream?.getTracks?.().forEach(t => t.stop()); } catch {}
+    if (vLocal && vLocal.srcObject) vLocal.srcObject = null;
+    localStream = null;
+    setStatus('Ended');
+  }
+
+  // ---------- chat DOM helpers ----------
+  const chatForm   = $('#chatForm');
+  const chatInput  = $('#chatInput');
+  const chatScroll = $('#chatScroll');
+  const typingDot  = $('#typingDot');
+  const clearBtn   = $('#clearThreadBtn');
+
+  function scrollToBottom() {
+    if (!chatScroll) return;
+    const nearBottom = (chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight) < 160;
+    chatScroll.scrollTo({ top: chatScroll.scrollHeight, behavior: nearBottom ? 'smooth' : 'auto' });
+  }
+
+  function renderMessage(m, meId) {
+    const mine = String(m.sender) === String(meId);
+    const created = m.createdAt || Date.now();
+
     const wrap = document.createElement('div');
-    wrap.className = `flex ${mine ? 'justify-end' : 'justify-start'}`;
+    wrap.className = mine ? 'chat chat-end' : 'chat chat-start';
 
     const bubble = document.createElement('div');
-    bubble.className =
-      `max-w-[85%] md:max-w-[75%] rounded-2xl px-3 py-2 ` +
-      (mine ? 'bg-primary text-white' : 'bg-gray-100');
-    bubble.dataset.id   = _id || '';
-    bubble.dataset.mine = mine ? '1' : '0';
-    const ts = new Date(createdAt || Date.now());
-    bubble.dataset.ts   = String(ts.getTime());
-
-    const text = document.createElement('div');
-    text.className = 'whitespace-pre-wrap break-words text-sm';
-    text.textContent = content;
+    bubble.className = mine ? 'chat-bubble chat-bubble-primary' : 'chat-bubble';
+    bubble.textContent = (m.content || '').trim();
+    bubble.dataset.created = new Date(created).toISOString();
 
     const meta = document.createElement('div');
-    meta.className = 'text-[10px] opacity-70 mt-1';
-    meta.innerHTML = mine ? `${ts.toLocaleString()} <span class="delivery">✓</span>`
-                          : ts.toLocaleString();
+    meta.className = 'text-[10px] opacity-60 mt-1';
+    meta.textContent = formatStamp(created);
+    meta.classList.add('msg-ts');
 
-    bubble.appendChild(text);
-    bubble.appendChild(meta);
     wrap.appendChild(bubble);
-    scrollBox?.appendChild(wrap);
-    if (scrollBox) scrollBox.scrollTop = scrollBox.scrollHeight;
+    wrap.appendChild(meta);
+    chatScroll?.appendChild(wrap);
   }
 
-  function removeTemp(tempId) {
-    const node = scrollBox?.querySelector(`[data-id="${tempId}"]`);
-    node?.parentElement?.remove();
+  // Enhance server-rendered bubbles if they carry data-created
+  function enhanceExisting() {
+    if (!chatScroll) return;
+    $$('.chat-bubble', chatScroll).forEach(bub => {
+      if (bub.nextElementSibling?.classList?.contains('msg-ts')) return; // already has ts
+      const iso = bub.getAttribute('data-created') || bub.dataset.created;
+      if (!iso) return;
+      const meta = document.createElement('div');
+      meta.className = 'text-[10px] opacity-60 mt-1 msg-ts';
+      meta.textContent = formatStamp(iso);
+      bub.parentElement?.appendChild(meta);
+    });
   }
 
-  function updateSeenMarker(untilTs) {
-    if (!scrollBox) return;
-    const mine = [...scrollBox.querySelectorAll('[data-mine="1"]')];
-    if (!mine.length) return;
+  function wire() {
+    const { me, peer } = getIds();
 
-    let target = null;
-    for (const b of mine) {
-      const ts = Number(b.dataset.ts || 0);
-      if (ts <= untilTs) target = b;
+    const sock = ensureSocket();
+    if (sock && me) {
+      sock.on('connect', () => { try { sock.emit('register_for_notifications', me); } catch {} });
     }
-    if (!target) return;
 
-    scrollBox.querySelectorAll('[data-mine="1"] .delivery').forEach(el => el.textContent = '✓');
-    $('#seenRow')?.remove();
+    // video open
+    [$('#videoBtn'), $('.video-call-btn')].filter(Boolean).forEach((btn) => {
+      const fresh = btn.cloneNode(true); btn.replaceWith(fresh);
+      fresh.addEventListener('click', async (e) => {
+        e.preventDefault();
+        openModal();
+        await startPreview();
+        if (sock && peer) { sock.emit('rtc:call', { to: peer, meta: { from: me, t: Date.now() } }); setStatus('Ringing…'); }
+      });
+    });
 
-    const mark = target.querySelector('.delivery');
-    if (mark) mark.textContent = '✓✓';
+    // video end
+    $$('.rtc-hangup, .video-end-btn', dlg || document).forEach((b) => {
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (sock && peer) sock.emit('rtc:end', { to: peer, reason: 'hangup' });
+        stopPreview(); closeModal();
+      });
+    });
+    dlg?.addEventListener('close', stopPreview);
+    window.addEventListener('beforeunload', stopPreview);
 
-    const seenRow = document.createElement('div');
-    seenRow.id = 'seenRow';
-    seenRow.className = 'text-[11px] text-gray-500 mt-1 text-right';
-    seenRow.textContent = 'Seen';
-    target.parentElement.appendChild(seenRow);
-  }
+    // send
+    if (chatForm && chatInput && peer) {
+      chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const content = (chatInput.value || '').trim();
+        if (!content) return;
 
-  // ---------- Send message ----------
-  if (form && input && scrollBox && isMongoId(otherUserId)) {
-    let sending = false;
-    on(form, 'submit', async (e) => {
-      e.preventDefault();
-      if (sending) return;
+        const optimistic = { sender: me, recipient: peer, content, createdAt: Date.now(), _temp: true };
+        renderMessage(optimistic, me); scrollToBottom();
 
-      let content = (input.value || '').trim();
-      if (!content) return;
-
-      sending = true;
-      const tempId = 'tmp_' + Math.random().toString(36).slice(2);
-      appendBubble({ _id: tempId, sender: currentUserId, content, createdAt: Date.now() });
-      input.value = '';
-
-      try {
-        const res = await fetch('/api/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ to: otherUserId, recipient: otherUserId, content })
-        });
-        const json = await res.json().catch(() => ({}));
-
-        if (!res.ok || json?.ok === false) {
-          removeTemp(tempId);
-          const msg = json?.message || json?.error ||
-                      (Array.isArray(json?.errors) && json.errors[0]?.msg) ||
-                      'Failed to send.';
-          alert(msg);
-          return;
+        chatInput.disabled = true;
+        try {
+          const res = await fetch('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ to: peer, content })
+          });
+          const j = await res.json().catch(()=>({}));
+          if (!res.ok || !j?.ok) {
+            chatScroll?.lastElementChild?.remove(); // remove optimistic
+            toast(j?.message || (res.status===403 ? 'Chat requires a match' : 'Failed to send'), 'error');
+            return;
+          }
+          toast('Message sent ✓', 'ok');
+          chatInput.value = '';
+          scrollToBottom();
+        } catch {
+          chatScroll?.lastElementChild?.remove();
+          toast('Network error', 'error');
+        } finally {
+          chatInput.disabled = false;
+          chatInput.focus();
         }
-        // final bubble will arrive via socket events
-      } catch (err) {
-        removeTemp(tempId);
-        alert('Network error sending message.');
-      } finally {
-        sending = false;
-      }
-    });
-  }
-
-  // ---------- Typing indicator ----------
-  if (input && isMongoId(otherUserId)) {
-    let lastTypeAt = 0;
-    on(input, 'input', () => {
-      const s = getSocket();
-      if (!s) return;
-      const now = Date.now();
-      if (now - lastTypeAt > 900) {
-        lastTypeAt = now;
-        s.emit('chat:typing', { to: otherUserId });
-      }
-    });
-  }
-
-  // ---------- Incoming messages + read receipts ----------
-  function onIncoming(m) {
-    if (String(m.sender) !== String(otherUserId)) return;
-    appendBubble(m);
-    fetch(`/api/messages/${encodeURIComponent(otherUserId)}/read`, { method:'POST', credentials:'include' })
-      .catch(()=>{});
-  }
-
-  // bind socket events when available
-  function bindSocketChatEvents() {
-    const s = getSocket();
-    if (!s) return;
-
-    s.off?.('chat:incoming', onIncoming);
-    s.off?.('new_message', onIncoming);
-
-    s.on('chat:incoming', onIncoming);
-    s.on('new_message',   onIncoming);
-
-    s.on('chat:typing', (p) => {
-      if (!p || String(p.from) !== String(otherUserId)) return;
-      if (typingDot) {
-        typingDot.style.opacity = '1';
-        setTimeout(() => typingDot.style.opacity = '0', 1200);
-      }
-    });
-
-    s.on('connect', () => {
-      const uid = ($('#currentUserId')?.value || '').trim();
-      if (uid) s.emit('register_for_notifications', uid);
-      if (isMongoId(otherUserId)) {
-        fetch(`/api/messages/${encodeURIComponent(otherUserId)}/read`, { method:'POST', credentials:'include' })
-          .catch(()=>{});
-      }
-    });
-
-    s.on('chat:read', (payload) => {
-      if (!payload || String(payload.with) !== String(currentUserId)) return;
-      const t = new Date(payload.until).getTime();
-      updateSeenMarker(t);
-    });
-
-    s.on('connect_error', (err) => {
-      if (String(err?.message).includes('upgrade-required')) {
-        window.location.href = '/upgrade?reason=video';
-      }
-    });
-  }
-
-  // initial attempt + listen for helper’s ping
-  bindSocketChatEvents();
-  window.addEventListener('socket:ready', bindSocketChatEvents, { once: true });
-
-  // ---------- Block / Report ----------
-  on(btnBlock, 'click', async () => {
-    if (!confirm('Block this user? They won’t be able to contact you.')) return;
-    try {
-      const r = await fetch(`/api/users/${encodeURIComponent(otherUserId)}/block`, {
-        method: 'POST', credentials: 'include'
       });
-      const d = await r.json().catch(()=>({}));
-      if (!r.ok || d.ok === false) throw 0;
-      alert('User blocked.');
-      location.href = '/messages';
-    } catch { alert('Could not block.'); }
-  });
+    }
 
-  on(btnReport, 'click', async () => {
-    const reason = prompt('Describe the issue (spam, harassment, fake profile, etc.)');
-    if (!reason) return;
-    try {
-      const r = await fetch('/api/report', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: otherUserId, reason })
+    // typing
+    let typingTimer = null;
+    if (chatInput && sock && peer) {
+      chatInput.addEventListener('input', () => { try { sock.emit('chat:typing', { to: peer }); } catch {} });
+      sock.on('chat:typing', (p={}) => {
+        if (String(p.from) !== String(peer)) return;
+        if (typingDot) typingDot.textContent = 'typing…';
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(()=> typingDot && (typingDot.textContent = '\u00A0'), 1200);
       });
-      const d = await r.json().catch(()=>({}));
-      if (!r.ok || d.ok === false) throw 0;
-      alert('Thanks for your report. We’ll review.');
-    } catch { alert('Report failed.'); }
-  });
+    }
 
-  // ---------- Clear conversation (CSP-safe) ----------
-  on(btnClear, 'click', async () => {
-    const otherId = btnClear?.dataset.otherId || ($('#otherUserId')?.value || '');
-    if (!isMongoId(otherId)) { alert('Missing peer id — cannot clear this thread.'); return; }
-    if (!confirm('Clear this conversation for you? (This does not delete for the other person.)')) return;
-
-    btnClear.disabled = true;
-    try {
-      let res = await fetch(`/api/messages/${encodeURIComponent(otherId)}/clear`, {
-        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }
+    // realtime
+    if (sock && chatScroll) {
+      sock.on('new_message', (m) => {
+        if (!m) return;
+        const { sender, recipient } = m;
+        const okThread =
+          (String(sender) === String(peer) && String(recipient) === String(me)) ||
+          (String(sender) === String(me)   && String(recipient) === String(peer));
+        if (!okThread) return;
+        renderMessage(m, me);
+        scrollToBottom();
       });
-      if (!res.ok) {
-        res = await fetch(`/api/messages/${encodeURIComponent(otherId)}`, {
-          method: 'DELETE', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || json.ok === false) {
-        alert(json.message || json.error || 'Could not clear chat.');
-        btnClear.disabled = false;
-        return;
-      }
-      if (scrollBox) {
-        scrollBox.innerHTML = '<div class="text-center text-sm opacity-70 py-6">Conversation cleared.</div>';
-      }
-      const badge = document.querySelector('[data-nav-msg], #msgBadge, .msg-badge');
-      if (badge) badge.textContent = '0';
-    } catch (e) {
-      console.warn('clear thread error', e);
-      alert('Could not clear chat right now.');
-    } finally {
-      btnClear.disabled = false;
     }
-  });
 
-  // ========== RTC (Video chat) ==========
-  const rtc = {
-    modal:   $('#rtc-modal'),
-    vLocal:  $('#rtc-local'),
-    vRemote: $('#rtc-remote'),
-    status:  $('#rtc-status'),
-    incomingUI: $('#rtc-incoming'),
-    btnMute:  null,
-    btnVideo: null,
-    btnEnds:  null
-  };
-  if (rtc.modal) {
-    rtc.btnMute  = rtc.modal.querySelector('.rtc-mute');
-    rtc.btnVideo = rtc.modal.querySelector('.rtc-video');
-    rtc.btnEnds  = rtc.modal.querySelectorAll('.rtc-hangup');
-  }
-
-  // Single RTC state (do NOT re-declare these anywhere else)
-  /** @type {RTCPeerConnection | null} */ let pc = null;
-  /** @type {MediaStream | null}        */ let localStream = null;
-  /** @type {boolean}                   */ let callActive = false;
-  /** @type {string}                    */ let peerId = '';
-  /** @type {any}                       */ let rtcCfg = null;
-
-  function setStatus(t)     { if (rtc.status) rtc.status.textContent = t || ''; }
-  function openRTCModal()   { try { rtc.modal?.showModal?.() } catch { rtc.modal?.classList?.remove?.('hidden'); } }
-  function closeRTCModal()  { try { rtc.modal?.close?.() }     catch { rtc.modal?.classList?.add?.('hidden'); } }
-
-  function flipUIToIdle() {
-    callActive = false;
-    if (btnCall) {
-      btnCall.textContent = '📹 Video chat';
-      btnCall.classList.remove('btn-error');
-      btnCall.classList.add('btn-ghost');
-      btnCall.removeAttribute('disabled');
-      btnCall.dataset.state = 'idle';
+    // clear
+    if (clearBtn) {
+      const otherId = clearBtn.getAttribute('data-other-id') || peer;
+      const fresh = clearBtn.cloneNode(true); clearBtn.replaceWith(fresh);
+      fresh.addEventListener('click', async () => {
+        if (!otherId) return;
+        if (!confirm('Clear this conversation for you?')) return;
+        fresh.disabled = true;
+        try {
+          const res = await fetch(`/api/messages/${otherId}/clear`, { method:'POST', credentials:'same-origin' });
+          const j = await res.json().catch(()=>({}));
+          if (!res.ok || !j?.ok) { toast(j?.message || 'Could not clear', 'error'); return; }
+          chatScroll && (chatScroll.innerHTML = '');
+          toast('Conversation cleared', 'ok');
+        } catch { toast('Network error', 'error'); }
+        finally { fresh.disabled = false; }
+      });
     }
-  }
-  function flipUIToInCall() {
-    callActive = true;
-    if (btnCall) {
-      btnCall.textContent = '⛔ End call';
-      btnCall.classList.add('btn-error');
-      btnCall.classList.remove('btn-ghost');
-      btnCall.removeAttribute('disabled');
-      btnCall.dataset.state = 'incall';
-    }
-    rtc.incomingUI?.classList?.add('hidden');
+
+    // add timestamps to any server-rendered bubbles (if they include data-created)
+    enhanceExisting();
   }
 
-  function getPeerId() {
-    const hidden = document.getElementById('otherUserId')?.value?.trim();
-    const data   = document.querySelector('.video-call-btn')?.dataset?.peerId?.trim();
-    const id = hidden || data || '';
-    return isMongoId(id) ? id : '';
-  }
-
-  async function fetchRTCConfig() {
-    if (rtcCfg) return rtcCfg;
-    try {
-      const r = await fetch('/api/rtc/config', { credentials: 'include' });
-      const j = await r.json().catch(()=>({}));
-      rtcCfg = j?.rtc || { iceServers:[{ urls:['stun:stun.l.google.com:19302'] }] };
-    } catch {
-      rtcCfg = { iceServers:[{ urls:['stun:stun.l.google.com:19302'] }] };
-    }
-    return rtcCfg;
-  }
-
-  async function ensureLocal() {
-    if (localStream) return localStream;
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:true });
-      if (rtc.vLocal) {
-        rtc.vLocal.srcObject = localStream;
-        rtc.vLocal.muted = true;
-        rtc.vLocal.playsInline = true;
-        rtc.vLocal.play?.().catch(()=>{});
-      }
-      return localStream;
-    } catch {
-      setStatus('Camera/mic blocked.');
-      return null;
-    }
-  }
-
-  async function initPC() {
-    const cfg = await fetchRTCConfig();
-    pc = new RTCPeerConnection(cfg);
-
-    pc.onicecandidate = (e) => {
-      const s = getSocket();
-      if (e.candidate && peerId && s) {
-        s.emit('rtc:candidate', { to: peerId, candidate: e.candidate });
-      }
-    };
-    pc.ontrack = (e) => {
-      const [stream] = e.streams;
-      if (rtc.vRemote && stream) {
-        rtc.vRemote.srcObject = stream;
-        rtc.vRemote.playsInline = true;
-        rtc.vRemote.play?.().catch(()=>{});
-      }
-    };
-
-    const ls = await ensureLocal(); if (!ls) return false;
-    if (pc.getSenders().length === 0) {
-      ls.getTracks().forEach(t => pc.addTrack(t, ls));
-    }
-    return true;
-  }
-
-  function teardownRTC() {
-    try { pc?.getSenders?.().forEach(s => s.track && s.track.stop?.()); } catch {}
-    try { localStream?.getTracks?.().forEach(t => t.stop?.()); } catch {}
-    try { pc?.close?.(); } catch {}
-    pc = null;
-    localStream = null;
-    if (rtc.vLocal)  rtc.vLocal.srcObject  = null;
-    if (rtc.vRemote) rtc.vRemote.srcObject = null;
-    setStatus('Idle');
-    flipUIToIdle();
-  }
-
-  async function startCall() {
-    const sock = getSocket();
-    const isReady = await waitForSocketConnected(sock);
-    if (!isReady) { alert('Connecting… try again in a moment.'); return; }
-    if (!sock)    { alert('Socket not ready for call.'); return; }
-
-    const rawPeer = getPeerId();
-    if (!isMongoId(rawPeer)) { alert('Cannot start call: missing user id.'); return; }
-    peerId = rawPeer;
-
-    openRTCModal(); setStatus('Starting…');
-    const inited = await initPC(); if (!inited) return;
-
-    // Optional pre-offer ring
-    try { sock.emit('rtc:call', { to: peerId, meta:{} }); } catch {}
-
-    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-    await pc.setLocalDescription(offer);
-    sock.emit('rtc:offer', { to: peerId, sdp: offer });
-
-    setStatus('Calling…');
-    flipUIToInCall();
-  }
-
-  function endCall(reason = 'hangup') {
-    const s = getSocket();
-    const to = peerId || getPeerId();
-    if (s && to) s.emit('rtc:end', { to, reason });
-    teardownRTC();
-    closeRTCModal();
-  }
-
-  // Socket RTC events
-  function bindRTCEvents() {
-    const s = getSocket(); if (!s || !isMongoId(otherUserId)) return;
-
-    s.off?.('rtc:ring');
-    s.off?.('rtc:offer');
-    s.off?.('rtc:answer');
-    s.off?.('rtc:candidate');
-    s.off?.('rtc:end');
-    s.off?.('rtc:error');
-
-    s.on('rtc:ring', ({ from }) => {
-      if (String(from) !== String(otherUserId)) return;
-      rtc.incomingUI?.classList?.remove('hidden');
-    });
-
-    const btnAccept  = $('#rtc-accept');
-    const btnDecline = $('#rtc-decline');
-    on(btnAccept, 'click', async () => {
-      rtc.incomingUI?.classList?.add('hidden');
-      setStatus('Connecting…');
-      const ok = await initPC(); if (!ok) return;
-    });
-    on(btnDecline, 'click', () => {
-      rtc.incomingUI?.classList?.add('hidden');
-      endCall('declined');
-    });
-
-    s.on('rtc:offer', async ({ from, sdp }) => {
-      if (String(from) !== String(otherUserId)) return;
-      peerId = from;
-      if (!pc) {
-        openRTCModal();
-        setStatus('Connecting…');
-        const ok = await initPC(); if (!ok) return;
-      }
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      s.emit('rtc:answer', { to: peerId, sdp: answer });
-      flipUIToInCall();
-    });
-
-    s.on('rtc:answer', async ({ from, sdp }) => {
-      if (String(from) !== String(otherUserId)) return;
-      if (!pc) return;
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      setStatus('Connected');
-      flipUIToInCall();
-    });
-
-    s.on('rtc:candidate', async ({ from, candidate }) => {
-      if (String(from) !== String(otherUserId)) return;
-      if (!pc || !candidate) return;
-      try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
-    });
-
-    s.on('rtc:end', ({ from /*, reason*/ }) => {
-      if (String(from) !== String(otherUserId)) return;
-      setStatus('Call ended');
-      endCall('remote-hangup');
-    });
-
-    s.on('rtc:error', (e) => {
-      if (String(e?.code) === 'upgrade-required') {
-        window.location.href = '/upgrade?reason=video';
-      } else {
-        alert(e?.message || 'Video call is not available.');
-      }
-      flipUIToIdle();
-    });
-  }
-
-  // Single wiring for the call button (toggle)
-  function wireCallButtons() {
-    on(btnCall, 'click', (e) => {
-      e.preventDefault();
-      if (callActive) endCall('hangup');
-      else startCall();
-    });
-
-    // Any explicit hangup buttons inside modal
-    rtc.btnEnds && rtc.btnEnds.forEach(b => on(b, 'click', () => endCall('hangup')));
-
-    // Debug click log (optional, keep or remove)
-    on(btnCall, 'click', () => {
-      const s = getSocket();
-      console.log('[rtc] click; socket?', !!s, 'connected?', !!s?.connected);
-    });
-  }
-
-  // Page init
-  function initPage() {
-    bindRTCEvents();
-    wireCallButtons();
-    flipUIToIdle();
-  }
-
-  // Kick off. If socket helper will fire 'socket:ready', re-init after reconnect as well.
-  if (!getSocket()) {
-    window.addEventListener('socket:ready', initPage, { once: true });
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire, { once:true });
   } else {
-    initPage();
+    wire();
   }
-  window.addEventListener('socket:ready', bindRTCEvents, { once: true });
+  window.addEventListener('socket:ready', wire);
 })();

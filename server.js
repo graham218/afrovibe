@@ -62,16 +62,6 @@ function planOf(u = {}) {
 function isElite(u)              { return planOf(u) === 'elite'; }
 function isPremiumOrBetter(u)    { const p = planOf(u); return p === 'elite' || p === 'premium'; }
 
-const RTC_CONFIG = {
-  iceServers: [
-    { urls: ['stun:stun.l.google.com:19302'] },
-    ...(process.env.TURN_URL ? [{
-      urls: [process.env.TURN_URL],
-      username: process.env.TURN_USER || '',
-      credential: process.env.TURN_PASS || ''
-    }] : [])
-  ]
-};
 
 const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
@@ -149,13 +139,6 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return Math.round(R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))) * 10) / 10;
 }
 
-// Show a lightning badge if boost has time left (adjust field names to yours)
-function computeBoostActive(u, nowMs = Date.now()) {
-  if (!u?.boostExpiresAt) return false;
-  return new Date(u.boostExpiresAt).getTime() > nowMs;
-}
-
-
 // Fast mutual check for the /matches page using in-memory sets
 function buildLikeSets(currentUser) {
   return {
@@ -204,8 +187,6 @@ async function getLastMessagesByPeer({ meObj, allIds }) {
 
 const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-// Serve uploaded images at https://yourdomain.com/uploads/filename.jpg
 app.use('/uploads', express.static(uploadDir));
 
 const storage = multer.diskStorage({
@@ -238,6 +219,20 @@ function toIntOrNull(v, min, max) {
   if (typeof min === 'number') n = Math.max(min, n);
   if (typeof max === 'number') n = Math.min(max, n);
   return n;
+}
+
+const DAILY_LIKE_LIMIT = Number(process.env.DAILY_LIKE_LIMIT || 10);
+
+// Users we should show anywhere in the product (cards, lists, profiles, etc.)
+function isActiveUserQuery() {
+  return {
+    $and: [
+      { $or: [{ isDeleted: { $ne: true } }, { isDeleted: { $exists: false } }] },
+      { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] },
+      { $or: [{ active: { $ne: false } }, { active: { $exists: false } }] },
+      { $or: [{ isDeactivated: { $ne: true } }, { isDeactivated: { $exists: false } }] },
+    ]
+  };
 }
 
 // --- Mongoose Models ---
@@ -410,10 +405,12 @@ async function getUnreadByThread(userId) {
   return map;
 }
 
-function computeBoostActive(u, nowMs) {
-  if (!u || !u.boostExpiresAt) return false;
-  const t = new Date(u.boostExpiresAt).getTime();
-  return Number.isFinite(t) && t > nowMs;
+if (typeof global.computeBoostActive !== 'function') {
+  global.computeBoostActive = function computeBoostActive(u, nowMs = Date.now()) {
+    if (!u || !u.boostExpiresAt) return false;
+    const t = new Date(u.boostExpiresAt).getTime();
+    return Number.isFinite(t) && t > nowMs;
+  };
 }
 
 const limiterDefaults = {
@@ -1000,6 +997,30 @@ app.use(async (req, res, next) => {
   }
 });
 
+// make currentUser + avatarUrl available to all EJS views (navbar, etc.)
+app.use(async (req, res, next) => {
+  res.locals.currentUser = null;
+  res.locals.avatarUrl = '/images/default-avatar.png';
+
+  if (req.session?.userId) {
+    try {
+      const u = await User.findById(req.session.userId)
+        .select('username profile.photos profile.city profile.country verifiedAt plan')
+        .lean();
+
+      if (u) {
+        res.locals.currentUser = u;
+
+        // normalize avatar: MUST start with "/" so <img src> works on any route depth
+        const raw = (u.profile?.photos?.[0]) || '';
+        const url = raw ? (raw.startsWith('/') ? raw : '/' + raw) : '/images/default-avatar.png';
+        res.locals.avatarUrl = url;
+      }
+    } catch { /* ignore; keep defaults */ }
+  }
+  next();
+});
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: {
@@ -1080,9 +1101,8 @@ app.use(async (req, res, next) => {
       Message.countDocuments({ recipient: meObj, read: false, deletedFor: { $nin: [meObj] } }),
       Notification.countDocuments({ recipient: meObj, read: false }),
     ]);
-
+  
     // likes remaining (free only)
-    const DAILY_LIKE_LIMIT = Number(process.env.DAILY_LIKE_LIMIT || 10);
     let likesRemaining = -1;
     if (u && !u.isPremium) {
       const todayKey = new Date().toDateString();
@@ -1349,31 +1369,30 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // --- RTC config (STUN/TURN) ---
 app.get('/api/rtc/config', checkAuth, (req, res) => {
-  // default Google STUN + optional TURN from env
-  const iceServers = [];
+  const iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
 
-  // public STUN
-  iceServers.push({ urls: ['stun:stun.l.google.com:19302'] });
-
-  // optional TURN (set in .env when you have a TURN service)
+  // Optional TURN (from .env)
   if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
+    // allow comma-separated list of TURN urls too
+    const urls = process.env.TURN_URL.split(',').map(s => s.trim()).filter(Boolean);
     iceServers.push({
-      urls: process.env.TURN_URL.split(',').map(s => s.trim()).filter(Boolean),
+      urls,
       username: process.env.TURN_USERNAME,
-      credential: process.env.TURN_CREDENTIAL
+      credential: process.env.TURN_CREDENTIAL,
     });
   }
 
-  res.json({ rtc: { iceServers } });
+  // Common shape (and nested for back-compat)
+  res.json({ iceServers, rtc: { iceServers } });
 });
 
+// Canonical: /profile simply redirects to /my-profile
 app.get('/profile', (req, res) => res.redirect(301, '/my-profile'));
 
-// View another user's profile
 app.get('/users/:id', checkAuth, async (req, res) => {
   try {
     const currentUserId = String(req.session.userId || '');
-    const profileId = String(req.params.id || '');
+    const profileId     = String(req.params.id || '');
 
     if (!mongoose.Types.ObjectId.isValid(profileId)) {
       return res.status(400).send('Invalid user ID');
@@ -1381,26 +1400,29 @@ app.get('/users/:id', checkAuth, async (req, res) => {
 
     const [currentUser, user] = await Promise.all([
       User.findById(currentUserId).lean(),
-      User.findById(profileId).lean(),
+      User.findOne({ _id: profileId, ...isActiveUserQuery() }).lean(), // 👈 only active users
     ]);
-    if (!currentUser || !user) return res.status(404).send('User not found');
 
-    // Normalize to string Sets to avoid ObjectId vs string mismatches
+    if (!currentUser) return res.status(404).send('User not found');
+    if (!user) {
+      return res.status(404).render('error', { status: 404, message: 'This account is not available.' });
+    }
+
     const set = arr => new Set((arr || []).map(v => String(v)));
-    const myLikes         = set(currentUser.likes);
-    const theirLikes      = set(user.likes);
-    const myBlocked       = set(currentUser.blockedUsers);
+    const myLikes    = set(currentUser.likes);
+    const theirLikes = set(user.likes);
+    const myBlocked  = set(currentUser.blockedUsers);
 
-    const hasLiked   = myLikes.has(profileId);
-    const isMatched  = hasLiked && theirLikes.has(currentUserId);
-    const isBlocked  = myBlocked.has(profileId);
+    const hasLiked  = myLikes.has(profileId);
+    const isMatched = hasLiked && theirLikes.has(currentUserId);
+    const isBlocked = myBlocked.has(profileId);
 
     const [unreadNotificationCount, unreadMessages] = await Promise.all([
       Notification.countDocuments({ recipient: currentUserId, read: false }),
       Message.countDocuments({ recipient: currentUserId, read: false }),
     ]);
 
-    const successMessage = req.query.payment === 'success'
+    const successMessage = (req.query.payment === 'success')
       ? 'Subscription successful! You are now a Premium Member.'
       : null;
 
@@ -1419,7 +1441,6 @@ app.get('/users/:id', checkAuth, async (req, res) => {
     res.status(500).send('Server Error');
   }
 });
-
 
 // GET /api/discover?limit=32&cursor=<lastId>&onlineNow=1&verifiedOnly=1&hasPhoto=1&minPhotos=3&q=...
 app.get('/api/discover', checkAuth, async (req, res) => {
@@ -1552,7 +1573,7 @@ app.post('/my-profile', checkAuth, upload.array('photos', MAX_PHOTOS), async (re
       relationshipGoals,
     };
 
-    await User.updateOne({ _id: meId }, { $set });
+    await User.updateOne({ _id: meId }, { $set: { 'profile.photos': merged } });
     res.redirect('/my-profile?updated=1');
   } catch (err) {
     console.error('POST /my-profile', err);
@@ -1585,115 +1606,71 @@ app.get('/edit-profile', checkAuth, async (req, res) => {
   }
 });
 
-
-// Helper function to handle empty strings for enum fields
-const getValidEnumValue = (value) => {
-    return value === '' ? undefined : value;
+// helpers
+const setIf = (obj, path, val) => {
+  if (val === undefined) return;
+  // allow empty-string clears if you want: if (val === '') return;  // uncomment to prevent clearing
+  obj[path] = val;
 };
 
 app.post('/edit-profile', checkAuth, async (req, res) => {
   try {
     const meId = req.session.userId;
 
-    // basics
-    const username = (req.body.username || '').toString().trim();
-    const age      = toIntOrNull(req.body.age, 18, 100);
-    const gender   = (req.body.gender || '').toString().trim();
-    const bio      = (req.body.bio || '').toString().trim();
+    // pull from form
+    const b = req.body;
+    const arr = v =>
+      Array.isArray(v) ? v.map(s=>String(s).trim()).filter(Boolean)
+                       : String(v||'').split(',').map(s=>s.trim()).filter(Boolean);
 
-    // location
-    const country       = (req.body.country || '').toString().trim();
-    const stateProvince = (req.body.stateProvince || '').toString().trim();
-    const city          = (req.body.city || '').toString().trim();
+    // build $set safely
+    const $set = {};
 
-    // work/edu
-    const occupation       = (req.body.occupation || '').toString().trim();
-    const employmentStatus = (req.body.employmentStatus || '').toString().trim();
-    const educationLevel   = (req.body.educationLevel || '').toString().trim();
+    setIf($set, 'username',               (b.username||'').trim());
+    setIf($set, 'profile.age',            (b.age ? Math.max(18, Math.min(100, parseInt(b.age,10))) : null));
+    setIf($set, 'profile.gender',         (b.gender||'').trim());
+    setIf($set, 'profile.bio',            (b.bio||'').trim());
 
-    // background
-    const nationality     = (req.body.nationality || '').toString().trim();
-    const religion        = (req.body.religion || '').toString().trim();
-    const starSign        = (req.body.starSign || '').toString().trim();
-    const languagesSpoken = normalizeArray(req.body.languagesSpoken);
+    setIf($set, 'profile.country',        (b.country||'').trim());
+    setIf($set, 'profile.stateProvince',  (b.stateProvince||'').trim());
+    setIf($set, 'profile.city',           (b.city||'').trim());
 
-    // lifestyle
-    const drinks  = (req.body.drinks || '').toString().trim();
-    const smokes  = (req.body.smokes || '').toString().trim();
-    const pets    = normalizeArray(req.body.pets);
-    const bodyArt = normalizeArray(req.body.bodyArt);
+    setIf($set, 'profile.occupation',     (b.occupation||'').trim());
+    setIf($set, 'profile.employmentStatus',(b.employmentStatus||'').trim());
+    setIf($set, 'profile.educationLevel', (b.educationLevel||'').trim());
 
-    // relationship/family
-    const relationshipLookingFor = normalizeArray(req.body.relationshipLookingFor);
-    const children          = (req.body.children || '').toString().trim();
-    const wantsMoreChildren = (req.body.wantsMoreChildren || '').toString().trim();
+    setIf($set, 'profile.nationality',    (b.nationality||'').trim());
+    setIf($set, 'profile.religion',       (b.religion||'').trim());
+    setIf($set, 'profile.starSign',       (b.starSign||'').trim());
+    setIf($set, 'profile.languagesSpoken',b.languagesSpoken ? arr(b.languagesSpoken) : []);
 
-    // interests
-    const interests        = normalizeArray(req.body.interests);
-    const hobbiesInterests = normalizeArray(req.body.hobbiesInterests);
+    setIf($set, 'profile.drinks',         (b.drinks||'').trim());
+    setIf($set, 'profile.smokes',         (b.smokes||'').trim());
+    setIf($set, 'profile.pets',           b.pets ? arr(b.pets) : []);
+    setIf($set, 'profile.bodyArt',        b.bodyArt ? arr(b.bodyArt) : []);
 
-    // personality (20 keys)
-    const keys = [
-      'earlyBirdNightOwl','stressHandling','idealWeekend','humorImportance','plannerSpontaneous',
-      'favoriteMusic','favoriteBookGenre','favoriteMovieGenre','enjoyCooking','travelImportance',
-      'stayActive','pdaComfort','communicationStyle','disagreementHandling','loveLanguage',
-      'introvertExtrovert','familyImportance','idealDate','tryingNewThings','biggestPetPeeve'
-    ];
-    const personality = {};
-    keys.forEach(k => personality[k] = (req.body[k] || '').toString().trim());
+    setIf($set, 'profile.relationshipLookingFor', b.relationshipLookingFor ? arr(b.relationshipLookingFor) : []);
+    setIf($set, 'profile.children',       (b.children||'').trim());
+    setIf($set, 'profile.wantsMoreChildren', (b.wantsMoreChildren||'').trim());
+
+    setIf($set, 'profile.interests',      b.interests ? arr(b.interests) : []);
+    setIf($set, 'profile.hobbiesInterests', b.hobbiesInterests ? arr(b.hobbiesInterests) : []);
 
     // prompts (top-level)
-    const favoriteAfricanArtists = (req.body.favoriteAfricanArtists || '').toString().trim();
-    const culturalTraditions     = (req.body.culturalTraditions || '').toString().trim();
-    const relationshipGoals      = (req.body.relationshipGoals || '').toString().trim();
-
-    // build update
-    const $set = {
-      username,
-      'profile.age': age,
-      'profile.gender': gender,
-      'profile.bio': bio,
-
-      'profile.country': country,
-      'profile.stateProvince': stateProvince,
-      'profile.city': city,
-
-      'profile.occupation': occupation,
-      'profile.employmentStatus': employmentStatus,
-      'profile.educationLevel': educationLevel,
-
-      'profile.nationality': nationality,
-      'profile.religion': religion,
-      'profile.starSign': starSign,
-      'profile.languagesSpoken': languagesSpoken,
-
-      'profile.drinks': drinks,
-      'profile.smokes': smokes,
-      'profile.pets': pets,
-      'profile.bodyArt': bodyArt,
-
-      'profile.relationshipLookingFor': relationshipLookingFor,
-      'profile.children': children,
-      'profile.wantsMoreChildren': wantsMoreChildren,
-
-      'profile.interests': interests,
-      'profile.hobbiesInterests': hobbiesInterests,
-
-      favoriteAfricanArtists,
-      culturalTraditions,
-      relationshipGoals
-    };
-    for (const [k, v] of Object.entries(personality)) {
-      $set[`profile.${k}`] = v;
-    }
+    setIf($set, 'favoriteAfricanArtists', (b.favoriteAfricanArtists||'').trim());
+    setIf($set, 'culturalTraditions',     (b.culturalTraditions||'').trim());
+    setIf($set, 'relationshipGoals',      (b.relationshipGoals||'').trim());
 
     await User.updateOne({ _id: meId }, { $set }, { runValidators: true });
-    res.redirect('/my-profile?updated=1');
-  } catch (err) {
-    console.error('POST /edit-profile', err);
-    res.status(500).render('error', { status: 500, message: 'Failed to save profile.' });
+
+    return res.redirect('/my-profile?updated=1');
+  } catch (e) {
+    console.error('POST /edit-profile error', e);
+    return res.status(500).render('error', { status: 500, message: 'Failed to save profile.' });
   }
 });
+
+
 
 app.get('/photos', checkAuth, async (req, res) => {
   try {
@@ -1717,6 +1694,25 @@ app.get('/photos', checkAuth, async (req, res) => {
     res.status(500).render('error', { status: 500, message: 'Failed to load photos.' });
   }
 });
+
+// POST /photos – add more photos
+app.post('/photos', checkAuth, upload.array('photos', MAX_PHOTOS), async (req, res) => {
+  try {
+    const meId = req.session.userId;
+    const me = await User.findById(meId).select('profile.photos').lean();
+
+    const uploaded = (req.files || []).map(file => '/uploads/' + file.filename);
+    const existing = Array.isArray(me?.profile?.photos) ? me.profile.photos : [];
+    const merged   = Array.from(new Set([...uploaded, ...existing])).slice(0, MAX_PHOTOS);
+
+    await User.updateOne({ _id: meId }, { $set: { 'profile.photos': merged } });
+    res.redirect('/photos?updated=1');
+  } catch (e) {
+    console.error('POST /photos error', e);
+    res.status(500).render('error', { status: 500, message: 'Could not upload photos.' });
+  }
+});
+
 
 app.post('/photos/upload', checkAuth, upload.array('profilePhotos', MAX_PHOTOS), async (req, res) => {
   try {
@@ -1929,10 +1925,10 @@ function isOnlineFrom(lastActive) {
   return (Date.now() - new Date(lastActive).getTime()) < 5 * 60 * 1000;
 }
 
-// --- PAGE: /matches (mutual matches, unread counts, last message)
+// --- PAGE: /matches (mutual/liked states, unread counts, last message) ---
 app.get('/matches', checkAuth, async (req, res) => {
   try {
-    const meId  = req.session.userId;
+    const meId  = String(req.session.userId);
     const meObj = new mongoose.Types.ObjectId(meId);
 
     const currentUser = await User.findById(meId)
@@ -1940,26 +1936,31 @@ app.get('/matches', checkAuth, async (req, res) => {
       .lean();
     if (!currentUser) return res.redirect('/login');
 
-    // Build sets from current user (fast, in-memory)
+    // Build sets from current user
     const { likedSet, likedBySet } = buildLikeSets(currentUser);
-    const allIdsStr = [...new Set([...likedSet, ...likedBySet])];
+
+    // We keep union so the page can show “likedMeOnly / iLikedOnly” tiles as you did
+    const unionIdsStr = [...new Set([...likedSet, ...likedBySet])];
 
     let cards = [];
-    if (allIdsStr.length) {
-      const allIds = allIdsStr.map(id => new mongoose.Types.ObjectId(id));
-
-      // Pull user cards (no per-user likes needed since we rely on currentUser.likedBy)
-      const users = await User.find({ _id: { $in: allIds } })
+    if (unionIdsStr.length) {
+      // FIRST: fetch only active users from the union
+      const unionIds = unionIdsStr.map(id => new mongoose.Types.ObjectId(id));
+      const activeUsers = await User.find({ _id: { $in: unionIds }, ...isActiveUserQuery() })
         .select('username createdAt verifiedAt lastActive profile.photos profile.age profile.city profile.country')
         .lean();
 
-      // Unread per thread (exclude my soft-deletes)
+      // Only keep ids that are still active
+      const activeIds = activeUsers.map(u => new mongoose.Types.ObjectId(u._id));
+      const activeIdsStr = activeUsers.map(u => String(u._id));
+
+      // Unread per active thread (exclude my soft-deletes)
       const unreadRows = await Message.aggregate([
         {
           $match: {
             recipient: meObj,
             read: false,
-            sender: { $in: allIds },
+            sender: { $in: activeIds },
             deletedFor: { $nin: [meObj] }
           }
         },
@@ -1967,11 +1968,11 @@ app.get('/matches', checkAuth, async (req, res) => {
       ]);
       const unreadBy = Object.fromEntries(unreadRows.map(r => [String(r._id), r.count]));
 
-      // Last message per pair (single query; exclude my soft-deletes)
-      const lastBy = await getLastMessagesByPeer({ meObj, allIds });
+      // Last message per active peer
+      const lastBy = await getLastMessagesByPeer({ meObj, allIds: activeIds });
 
-      // Build cards + flags
-      cards = users.map(u => {
+      // Build cards + flags using ONLY active users
+      cards = activeUsers.map(u => {
         const idStr = String(u._id);
         const last  = lastBy[idStr] || null;
 
@@ -1982,22 +1983,25 @@ app.get('/matches', checkAuth, async (req, res) => {
         const lastMessage = last ? {
           content:   last.content,
           createdAt: last.createdAt,
-          mine:      String(last.sender) === String(meId),
+          mine:      String(last.sender) === meId,
         } : null;
 
         const isNew = isNewBadge({ lastMessage, userCreatedAt: u.createdAt });
 
         return {
           ...u,
-          isMutual, likedMeOnly, iLikedOnly, isNew,
+          isMutual,
+          likedMeOnly,
+          iLikedOnly,
+          isNew,
           unreadCount: unreadBy[idStr] || 0,
           lastMessage
         };
       }).sort((a, b) => {
-        // Sort: most recent last message first; then mutuals; then username
+        // Sort: most recent last message; then mutuals; then username
         const ta = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
         const tb = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
-        return tb - ta || (b.isMutual - a.isMutual) || a.username.localeCompare(b.username);
+        return (tb - ta) || ((b.isMutual ? 1 : 0) - (a.isMutual ? 1 : 0)) || a.username.localeCompare(b.username);
       });
     }
 
@@ -2017,6 +2021,7 @@ app.get('/matches', checkAuth, async (req, res) => {
     return res.status(500).render('error', { status: 500, message: 'Failed to load matches.' });
   }
 });
+
 
 // --- Premium gating for filters (shared by /dashboard and /advanced-search) ---
 const FREE_MAX_RADIUS_KM = Number(process.env.FREE_MAX_RADIUS_KM || 25);
@@ -2369,57 +2374,77 @@ app.get('/advanced-search', checkAuth, async (req, res) => {
 // GET /viewed-you
 app.get('/viewed-you', checkAuth, async (req, res) => {
   try {
-    const currentUser = await User.findById(req.session.userId)
+    const meId = req.session.userId;
+    const currentUser = await User.findById(meId)
       .select('isPremium blockedUsers views')
       .lean();
     if (!currentUser) return res.redirect('/login');
 
+    // Blocked users set
     const blocked = new Set((currentUser.blockedUsers || []).map(String));
 
-    // group by viewer -> latest view time
+    // Group by viewer -> keep LATEST view time (latest first)
     const latestByViewer = new Map();
     for (const v of (currentUser.views || [])) {
+      // v: { user: ObjectId, at: Date }
       const k = String(v.user);
       if (blocked.has(k)) continue;
-      if (!latestByViewer.has(k) || latestByViewer.get(k) < v.at) {
-        latestByViewer.set(k, v.at);
-      }
+      const t = (v.at instanceof Date) ? v.at.getTime() : new Date(v.at).getTime();
+      const prev = latestByViewer.get(k);
+      if (!prev || t > prev) latestByViewer.set(k, t);
     }
-    const viewers = [...latestByViewer.entries()]
+
+    // Sorted viewer ids by latest view time (desc)
+    const viewerIds = [...latestByViewer.entries()]
       .sort((a, b) => b[1] - a[1]) // latest first
       .map(([id]) => id);
 
-    // paging
+    // Paging
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '24', 10), 1), 48);
     const skip  = (page - 1) * limit;
-    const total = viewers.length;
-    const slice = viewers.slice(skip, skip + limit);
+    const total = viewerIds.length;
+    const slice = viewerIds.slice(skip, skip + limit); // array of string ids
 
+    // Projection
     const projection = {
       username: 1, verifiedAt: 1, lastActive: 1,
       'profile.age': 1, 'profile.city': 1, 'profile.country': 1, 'profile.photos': 1
     };
-    const people = slice.length
-      ? await User.find({ _id: { $in: slice } }).select(projection).lean()
-      : [];
 
-    // For now: free users always blurred on /viewed-you; premium = unblurred
+    // Fetch only active users, then put them back in "slice" order
+    let people = [];
+    if (slice.length) {
+      const raw = await User.find({ _id: { $in: slice }, ...isActiveUserQuery() })
+        .select(projection)
+        .lean();
+
+      const byId = new Map(raw.map(u => [String(u._id), u]));
+      people = slice.map(id => byId.get(String(id))).filter(Boolean);
+    }
+
+    // Premium = unblurred, free = blurred
     const blurred = !currentUser.isPremium;
 
-    res.render('viewed-you', {
+    // Navbar badges
+    const [unreadMessages, unreadNotificationCount] = await Promise.all([
+      Message.countDocuments({ recipient: meId, read: false }),
+      Notification.countDocuments({ recipient: meId, read: false }),
+    ]);
+
+    return res.render('viewed-you', {
       currentUser,
       people,
       blurred,
       pageMeta: {
         page, limit, total, totalPages: Math.max(Math.ceil(total / limit), 1)
       },
-      unreadMessages: await Message.countDocuments({ recipient: currentUser._id, read: false }),
-      unreadNotificationCount: await Notification.countDocuments({ recipient: currentUser._id, read: false }),
+      unreadMessages,
+      unreadNotificationCount,
     });
   } catch (e) {
     console.error('viewed-you err', e);
-    res.status(500).render('error', { status: 500, message: 'Failed to load Viewed You.' });
+    return res.status(500).render('error', { status: 500, message: 'Failed to load Viewed You.' });
   }
 });
 
@@ -2456,9 +2481,11 @@ app.get('/likes-you', checkAuth, async (req, res) => {
       'profile.age': 1, 'profile.city': 1, 'profile.country': 1, 'profile.photos': 1
     };
 
-    const peopleDocs = slice.length
-      ? await User.find({ _id: { $in: slice } }).select(projection).lean()
-      : [];
+    const peopleDoc = slice.length
+  ? await User.find({ _id: { $in: slice }, ...isActiveUserQuery() })
+      .select('username verifiedAt lastActive profile.photos profile.age profile.city profile.country')
+      .lean()
+  : [];
 
     // restore the original order of `slice`
     const order = new Map(slice.map((id, i) => [String(id), i]));
@@ -2671,13 +2698,176 @@ const fetchUserAndCounts = async (req, res, next) => {
   }
 };
 
-// Route to render the main settings page
-app.get('/settings', checkAuth, fetchUserAndCounts, (req, res) => {
-  res.render('settings', { 
-    unreadMessages: req.unreadMessages, 
-    unreadNotificationCount: req.unreadNotificationCount,
-    currentUser: req.currentUser 
+// --- SETTINGS PAGE ---
+app.get('/settings', checkAuth, async (req, res) => {
+  const me = await User.findById(req.session.userId).lean();
+  if (!me) return res.redirect('/login');
+
+  const [unreadMessages, unreadNotificationCount] = await Promise.all([
+    Message.countDocuments({ recipient: me._id, read: false }),
+    Notification.countDocuments({ recipient: me._id, read: false }),
+  ]);
+
+  res.render('settings', {
+    pageTitle: 'Settings',
+    currentUser: me,
+    unreadMessages,
+    unreadNotificationCount,
   });
+});
+
+// --- DEACTIVATE (soft pause; reversible) ---
+app.post('/settings/deactivate', checkAuth, async (req, res) => {
+  try {
+    const { reason = '', note = '' } = req.body || {};
+    await User.updateOne(
+      { _id: req.session.userId },
+      {
+        $set: {
+          isDeactivated: true,
+          active: false,
+          deactivatedAt: new Date(),
+          deactivateReason: reason,
+          deactivateNote: note,
+        },
+      }
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('deactivate err', e);
+    res.status(500).json({ ok: false, message: 'Server error' });
+  }
+});
+
+// --- REACTIVATE ---
+app.post('/settings/reactivate', checkAuth, async (req, res) => {
+  try {
+    await User.updateOne(
+      { _id: req.session.userId },
+      {
+        $unset: {
+          isDeactivated: '',
+          deactivatedAt: '',
+          deactivateReason: '',
+          deactivateNote: '',
+        },
+        $set: { active: true },
+      }
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('reactivate err', e);
+    res.status(500).json({ ok: false, message: 'Server error' });
+  }
+});
+
+// --- DELETE (soft-anonymize immediately; disappears from product) ---
+app.post('/settings/delete', checkAuth, async (req, res) => {
+  try {
+    const { reason = '', note = '' } = req.body || {};
+    const u = await User.findById(req.session.userId).select('_id username email').lean();
+    if (!u) return res.status(404).json({ ok: false, message: 'User not found' });
+
+    const anonName = 'deleted_' + String(u._id).slice(-6);
+
+    await User.updateOne(
+      { _id: u._id },
+      {
+        $set: {
+          isDeleted: true,
+          active: false,
+          deletedAt: new Date(),
+          username: anonName,
+          email: `deleted_${u._id}@example.invalid`,
+          'profile.bio': '',
+          'profile.photos': [],
+          deleteReason: reason,
+          deleteNote: note,
+        },
+      }
+    );
+
+    req.session.destroy(() => res.json({ ok: true, redirect: '/goodbye' }));
+  } catch (e) {
+    console.error('delete account err', e);
+    res.status(500).json({ ok: false, message: 'Server error' });
+  }
+});
+
+app.get('/goodbye', (req, res) => {
+  res.render('error', {
+    status: 200,
+    message: 'Your account was deleted. We’re sad to see you go 💛'
+  });
+});
+
+// Deactivate (reversible)
+app.post('/account/deactivate', checkAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { reason = '', details = '' } = req.body || {};
+
+    const update = {
+      active: false,
+      deactivatedAt: new Date(),
+      'account.deactivation': { reason, details }
+    };
+    await User.updateOne({ _id: userId }, { $set: update });
+
+    // kill session and send redirect target
+    req.session.destroy(() => {
+      res.json({ ok: true, redirect: '/login?deactivated=1' });
+    });
+  } catch (e) {
+    console.error('deactivate err', e);
+    res.status(500).json({ ok: false, message: 'Server error' });
+  }
+});
+
+app.post('/account/delete', checkAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { reason = '', details = '' } = req.body || {};
+    const u = await User.findById(userId).select('_id username email').lean();
+    if (!u) return res.status(404).json({ ok: false, message: 'User not found' });
+
+    const anonName = 'deleted_' + String(u._id).slice(-6);
+
+    // 1) Soft-delete/anonymize this user
+    await User.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          deletedAt: new Date(),
+          isDeleted: true,
+          active: false,
+          username: anonName,
+          email: `deleted_${u._id}@example.invalid`,
+          'profile.bio': '',
+          'profile.photos': [],
+          'account.deletion': { reason, details }
+        }
+      }
+    );
+
+    // 2) Remove this user from others’ lists so they won't surface
+    await Promise.all([
+      User.updateMany({ likes: userId },     { $pull: { likes: userId } }),
+      User.updateMany({ likedBy: userId },   { $pull: { likedBy: userId } }),
+      User.updateMany({ favorites: userId }, { $pull: { favorites: userId } }),
+      User.updateMany({ blockedUsers: userId }, { $pull: { blockedUsers: userId } }),
+    ]);
+
+    // 3) (Optional) collapse their visibility in messages list by replacing lastMessage previews, etc.
+    // Minimal approach: do nothing to preserve history; your list filters will hide them now.
+
+    req.session.destroy(() => {
+      res.json({ ok: true, redirect: '/goodbye' });
+    });
+  } catch (e) {
+    console.error('delete account err', e);
+    res.status(500).json({ ok: false, message: 'Server error' });
+  }
 });
 
 // Route for email settings
@@ -3029,8 +3219,8 @@ async function superLikeHandler(req, res) {
 // Keep your middleware vibe (reuse validateObjectId/likeLimiter if you want)
 app.post('/superlike/:id', checkAuth, validateObjectId('id'), validate, superLikeHandler);
 app.post('/api/superlike/:id', checkAuth, validateObjectId('id'), validate, superLikeHandler);
-
-// ---- GET - Dashboard (merged + advanced filters + member level) ----
+app.get('/', (req, res) => res.redirect(302, '/dashboard'));
+// ---- GET - Dashboard (merged: filters + boost + active-user filter) ----
 app.get('/dashboard', checkAuth, async (req, res) => {
   try {
     const now = Date.now();
@@ -3039,8 +3229,7 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       .populate('likes', '_id')
       .populate('dislikes', '_id')
       .populate('blockedUsers', '_id')
-      .exec();
-
+      .lean();
     if (!currentUser) {
       req.session.destroy(() => {});
       return res.redirect('/login');
@@ -3075,7 +3264,7 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       interests     : toTrimmed(req.query.interests) || '',
       location      : toTrimmed(req.query.location) || '',
 
-      // NEW:
+      // NEW toggles/filters
       verifiedOnly  : req.query.verifiedOnly || '',
       onlineNow     : req.query.onlineNow || '',
       hasPhoto      : req.query.hasPhoto || '',
@@ -3083,16 +3272,15 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       radiusKm      : toTrimmed(req.query.radiusKm) || '',
       religion      : toTrimmed(req.query.religion) || '',
       denomination  : toTrimmed(req.query.denomination) || '',
-      languages     : req.query.languages || '',   // string CSV or array
+      languages     : req.query.languages || '', // CSV or array
       education     : toTrimmed(req.query.education) || '',
       smoking       : toTrimmed(req.query.smoking) || '',
       drinking      : toTrimmed(req.query.drinking) || '',
-      sort          : req.query.sort || 'active',  // includes 'distance'
-      // NOTE: If you support videoChat here, it should be on rawFilters too ('' | '1' | '0')
+      sort          : req.query.sort || 'active',
       videoChat     : toTrimmed(req.query.videoChat || ''),
     };
 
-    // ---- Premium clamp (added) ----
+    // ---- Premium clamp (free tier limits) ----
     const FREE_MAX_RADIUS_KM = Number(process.env.FREE_MAX_RADIUS_KM || 25);
     function clampFiltersForFree(filters, isPremium) {
       const out = { ...filters };
@@ -3115,22 +3303,25 @@ app.get('/dashboard', checkAuth, async (req, res) => {
     const { filters, locks: l2 }     = clampFiltersByPlan(f1, currentUser);
     const premiumLocks               = { ...l1, ...l2 };
 
-    // ---- Paging (page-based SSR) ----
+    // ---- Paging ----
     const page  = Math.max(toInt(req.query.page, 1), 1);
-    const limit = Math.min(Math.max(toInt(req.query.limit || req.query.pageSize, 24), 6), 48); // accepts pageSize alias
+    const limit = Math.min(Math.max(toInt(req.query.limit || req.query.pageSize, 24), 6), 48);
     const skip  = (page - 1) * limit;
 
-    // ---- Sorting (boost first, then chosen order) ----
-    const sortKey = filters.sort || 'active';
-    let sortBase = { lastActive: -1, _id: -1 };
-    if (sortKey === 'recent')   sortBase = { createdAt: -1, _id: -1 };
-    if (sortKey === 'ageAsc')   sortBase = { 'profile.age': 1,  _id: -1 };
-    if (sortKey === 'ageDesc')  sortBase = { 'profile.age': -1, _id: -1 };
-    // distance sort handled post-fetch (after we compute distances)
+    // ---- Sorting (boost first + chosen order) ----
+    const sortKey  = filters.sort || 'active';
+    let   sortBase = { lastActive: -1, _id: -1 };
+    if (sortKey === 'recent')  sortBase = { createdAt: -1, _id: -1 };
+    if (sortKey === 'ageAsc')  sortBase = { 'profile.age': 1,  _id: -1 };
+    if (sortKey === 'ageDesc') sortBase = { 'profile.age': -1, _id: -1 };
     const sort = { boostExpiresAt: -1, ...sortBase };
 
-    // ---- Base query ----
-    const query = { _id: { $nin: excludedUserIds }, profile: { $exists: true } };
+    // ---- Base query (NOW with "active user" filter) ----
+    const query = {
+      ...isActiveUserQuery(),             // 👈 hide deleted/paused accounts
+      _id: { $nin: excludedUserIds },
+      profile: { $exists: true }
+    };
 
     // strict filter only if Elite:
     if (filters.videoChat === '1' && isElite(currentUser)) {
@@ -3163,7 +3354,7 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       query['profile.interests'] = { $regex: filters.interests, $options: 'i' };
     }
 
-    // ---- Advanced filters ----
+    // ---- Advanced toggles ----
     if (filters.verifiedOnly === '1')  query.verifiedAt = { $ne: null };
     if (filters.onlineNow   === '1')   query.lastActive = { $gte: new Date(Date.now() - 5 * 60 * 1000) };
     if (filters.hasPhoto    === '1')   query['profile.photos.0'] = { $exists: true, $ne: null };
@@ -3269,19 +3460,24 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       };
     });
 
-    // ---- Likes remaining (freemium) ----
-    let likesRemaining = -1;
-    if (!currentUser.isPremium) {
-      const today   = new Date().toDateString();
-      const lastDay = currentUser.lastLikeDate ? new Date(currentUser.lastLikeDate).toDateString() : null;
-      if (today !== lastDay) {
-        currentUser.likesToday   = 0;
-        currentUser.lastLikeDate = new Date();
-        await currentUser.save();
-      }
-      const used = Number(currentUser.likesToday || 0);
-      likesRemaining = Math.max(DAILY_LIKE_LIMIT - used, 0);
-    }
+// ---- Likes remaining (freemium) ----
+let likesRemaining = -1;
+if (!currentUser.isPremium) {
+  const todayKey = new Date().toDateString();
+  const lastKey  = currentUser.lastLikeDate ? new Date(currentUser.lastLikeDate).toDateString() : null;
+
+  // reset counters when day rolls over
+  if (todayKey !== lastKey) {
+    await User.updateOne(
+      { _id: currentUser._id },
+      { $set: { likesToday: 0, lastLikeDate: new Date() } }
+    );
+    currentUser.likesToday = 0;
+  }
+
+  const used = Number(currentUser.likesToday || 0);
+  likesRemaining = Math.max(DAILY_LIKE_LIMIT - used, 0);
+}
 
     // ---- Unread counts ----
     const [unreadNotificationCount, unreadMessages] = await Promise.all([
@@ -3289,10 +3485,14 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       Message.countDocuments({ recipient: currentUser._id, read: false }),
     ]);
 
-    // ---- Daily suggestions (newest) ----
+    // ---- Daily suggestions (newest) – ALSO apply isActiveUserQuery() ----
     let dailySuggestions = [];
     try {
-      const rawDaily = await User.find({ _id: { $nin: excludedUserIds }, profile: { $exists: true } })
+      const rawDaily = await User.find({
+          ...isActiveUserQuery(),                          // 👈 add here
+          _id: { $nin: excludedUserIds },
+          profile: { $exists: true },
+        })
         .select(projection)
         .sort({ createdAt: -1, _id: -1 })
         .limit(12)
@@ -3300,7 +3500,6 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       dailySuggestions = (rawDaily || []).map(enhance);
     } catch { dailySuggestions = []; }
 
-    // Mirror flags on daily suggestions (optional)
     dailySuggestions = (dailySuggestions || []).map(u => {
       const idStr = String(u._id);
       return {
@@ -3314,7 +3513,7 @@ app.get('/dashboard', checkAuth, async (req, res) => {
     const streak = { day: Number(currentUser.streakDay || 0), target: 7, percentage: 0 };
     streak.percentage = Math.max(0, Math.min(100, (streak.day / streak.target) * 100));
 
-    // ---- Page meta (with hasPrev / hasNext for EJS) ----
+    // ---- Page meta ----
     const totalPages = Math.max(Math.ceil(total / limit), 1);
     const pageMeta = {
       page,
@@ -3334,8 +3533,8 @@ app.get('/dashboard', checkAuth, async (req, res) => {
       likesRemaining,
       unreadNotificationCount: unreadNotificationCount || 0,
       unreadMessages: unreadMessages || 0,
-      filters,              // clamped filters (sticky in UI + used for Prev/Next URLs)
-      premiumLocks,         // which controls were locked
+      filters,          // clamped filters (sticky in UI)
+      premiumLocks,     // which controls were locked
       pageMeta,
       streak,
     });
@@ -3610,6 +3809,12 @@ app.get('/favorites', checkAuth, async (req, res) => {
       isFavorite: favoriteSet.has(String(u._id)),
       iWaved: wavedSet.has(String(u._id)),
     }));
+
+    const favorites = favIds.length
+  ? await User.find({ _id: { $in: favIds }, ...isActiveUserQuery() })
+      .select('username verifiedAt lastActive profile.photos profile.age profile.city profile.country')
+      .lean()
+  : [];
 
     // navbar counts
     const [unreadMessages, unreadNotificationCount] = await Promise.all([
@@ -4339,28 +4544,27 @@ app.post(
 app.post('/api/messages', checkAuth, messagesLimiter, vMessageSend, async (req, res) => {
   try {
     const sender = String(req.session.userId || '');
-    let recipient = (req.body.to || req.body.recipient || '').trim();
-    let content   = (req.body.content || '').trim();
+    const recipient = String((req.body.to || req.body.recipient || '').trim());
+    let content = (req.body.content || '').trim();
 
     if (!sender) return res.status(401).json({ ok: false, error: 'auth' });
-    if (!recipient || !ObjectId.isValid(recipient)) {
-      return res.status(400).json({
-        ok: false,
-        errors: [{ type: 'field', msg: 'to must be a MongoId', path: 'to', location: 'body' }],
-      });
+    if (!recipient || !mongoose.Types.ObjectId.isValid(recipient)) {
+      return res.status(400).json({ ok: false, error: 'bad_recipient' });
     }
     if (recipient === sender) {
-      return res.status(400).json({ ok: false, error: 'Cannot message yourself' });
+      return res.status(400).json({ ok: false, error: 'self' });
     }
     content = content.slice(0, 4000);
-    if (!content) {
-      return res.status(400).json({
-        ok: false,
-        errors: [{ type: 'field', msg: 'content is required', path: 'content', location: 'body' }],
-      });
+    if (!content) return res.status(400).json({ ok: false, error: 'empty' });
+
+    // 🔒 recipient must be “active” in the product
+    const recip = await User.findOne({ _id: recipient, ...isActiveUserQuery() })
+      .select('_id').lean();
+    if (!recip) {
+      return res.status(410).json({ ok: false, code: 'recipient_unavailable', message: 'This account is not available.' });
     }
 
-    // Require mutual match (keep/remove per your product rules)
+    // require mutual match (keep/remove per your rules)
     const matched = await isMutualMatch(sender, recipient);
     if (!matched) {
       return res.status(403).json({ ok: false, code: 'not_matched', message: 'Chat requires a mutual match.' });
@@ -4372,11 +4576,10 @@ app.post('/api/messages', checkAuth, messagesLimiter, vMessageSend, async (req, 
     ioRef?.to(String(recipient)).emit('chat:incoming', message);
     ioRef?.to(String(sender)).emit('chat:sent', message);
 
-    const recipObj = new ObjectId(recipient);
+    // unread count (exclude soft-deleted)
+    const recipObj = new mongoose.Types.ObjectId(recipient);
     const unread = await Message.countDocuments({
-      recipient: recipObj,
-      read: false,
-      deletedFor: { $nin: [recipObj] }
+      recipient: recipObj, read: false, deletedFor: { $nin: [recipObj] }
     });
     ioRef?.to(String(recipient)).emit('unread_update', { unread });
 
@@ -4386,7 +4589,6 @@ app.post('/api/messages', checkAuth, messagesLimiter, vMessageSend, async (req, 
     return res.status(500).json({ ok: false });
   }
 });
-
 
 // Mark a thread as read (robust + precise receipts)
 app.post('/api/messages/:otherUserId/read', checkAuth, async (req, res) => {

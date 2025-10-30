@@ -3,7 +3,7 @@
   <!-- Left: brand + mobile menu -->
   <div class="navbar-start">
     <div class="dropdown">
-      <label tabindex="0" class="btn btn-ghost lg:hidden text-white" aria-label="Open menu">
+      <label tabindex="0" class="btn btn-ghost lg:hidden text-black" aria-label="Open menu">
         <!-- hamburger -->
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -63,26 +63,26 @@
       </ul>
     </div>
 
-    <a href="/dashboard" class="btn btn-ghost text-xl text-white tracking-tight">🌍 AfroVibe</a>
+    <a href="/dashboard" class="btn btn-ghost text-xl text-black tracking-tight">🌍 AfroVibe</a>
   </div>
 
   <!-- Center: desktop menu -->
   <div class="navbar-center hidden lg:flex">
     <ul class="menu menu-horizontal px-1 text-[15px]">
-      <li><a href="/dashboard" class="text-white/95 hover:text-white">Home</a></li>
+      <li><a href="/dashboard" class="text-black/95 hover:text-black">Home</a></li>
       <li>
-        <a href="/messages" class="text-white/95 hover:text-white">
+        <a href="/messages" class="text-black/95 hover:text-black">
           Messages
           <span class="badge badge-error badge-sm nav-unread-messages ml-1 <%= (typeof unreadMessages !== 'undefined' && unreadMessages > 0) ? '' : 'hidden' %>">
             <%= typeof unreadMessages !== 'undefined' && unreadMessages > 0 ? unreadMessages : '' %>
           </span>
         </a>
       </li>
-      <li><a href="/matches" class="text-white/95 hover:text-white">Matches</a></li>
+      <li><a href="/matches" class="text-black/95 hover:text-black">Matches</a></li>
 
       <!-- Desktop: Connections -->
       <li class="dropdown dropdown-hover">
-        <label tabindex="0" class="text-white/95 hover:text-white">Connections</label>
+        <label tabindex="0" class="text-black/95 hover:text-black">Connections</label>
         <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-2xl w-52">
           <li><a href="/likes-you">Likes You</a></li>
           <li><a href="/favorites">Favorites</a></li>
@@ -91,8 +91,8 @@
         </ul>
       </li>
 
-      <li><a href="/advanced-search" class="text-white/95 hover:text-white">Advanced Search</a></li>
-      <li><a href="/settings" class="text-white/95 hover:text-white">Settings</a></li>
+      <li><a href="/advanced-search" class="text-black/95 hover:text-black">Advanced Search</a></li>
+      <li><a href="/settings" class="text-black/95 hover:text-black">Settings</a></li>
     </ul>
   </div>
 
@@ -111,7 +111,7 @@
 
     <!-- Notifications (desktop) -->
     <div class="hidden md:flex items-center mr-1">
-      <a href="/notifications" class="btn btn-ghost btn-circle text-white" aria-label="Notifications">
+      <a href="/notifications" class="btn btn-ghost btn-circle text-black" aria-label="Notifications">
         <div class="indicator">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
                viewBox="0 0 24 24" stroke="currentColor">
@@ -126,7 +126,7 @@
     </div>
 
     <% if (typeof likesRemaining !== 'undefined' || typeof streak !== 'undefined') { %>
-      <div class="hidden md:flex items-center gap-3 mr-1 text-white/95">
+      <div class="hidden md:flex items-center gap-3 mr-1 text-black/95">
         <% if (typeof streak !== 'undefined') { %>
           <div class="flex items-center gap-2">
             <span class="text-[12px] opacity-90">Streak <%= streak.day %>/<%= streak.target %></span>
@@ -156,6 +156,14 @@
             <img src="/images/default-avatar.png" alt="Profile" class="w-full h-full object-cover">
           <% } %>
         </div>
+
+        <% const navAvatar = typeof avatarUrl === 'string' && avatarUrl ? avatarUrl : '/images/default-avatar.png'; %>
+<div class="btn btn-ghost btn-circle avatar">
+  <div class="w-10 h-10 rounded-full ring-1 ring-white/50 overflow-hidden">
+    <img src="<%= navAvatar %>" alt="Profile" class="w-full h-full object-cover select-none">
+  </div>
+</div>
+
       </label>
       <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[101] p-2 shadow bg-base-100 rounded-2xl w-56">
         <li class="font-semibold px-3 py-1"><%= currentUser?.username || 'Profile' %></li>
