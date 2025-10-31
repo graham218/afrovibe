@@ -29,9 +29,82 @@
       position: absolute; inset: 0;
       background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.55));
     }
+
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.92; }
+    }
+    .animate-pulse-slow {
+      animation: pulse-slow 3s ease-in-out infinite;
+    }
+
+    /* 🔥 INTERACTIVE CAROUSEL STYLES 🔥 */
+    .carousel-item img { 
+      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+      cursor: grab !important;
+      filter: grayscale(10%) brightness(0.95);
+      border-radius: 1rem !important;
+    }
+    .carousel-item img:hover { 
+      transform: scale(1.05) !important;
+      filter: grayscale(0%) brightness(1.1) !important;
+      box-shadow: 0 25px 50px -12px rgba(255, 107, 107, 0.5) !important;
+      z-index: 10 !important;
+    }
+    .carousel-item img:active { 
+      cursor: grabbing !important; 
+    }
+    
+    /* Navigation dots */
+    .carousel-dots { 
+      display: flex !important; 
+      gap: 0.5rem; 
+      justify-content: center; 
+      margin-top: 1.5rem;
+    }
+    .carousel-dot { 
+      width: 12px; height: 12px; 
+      border-radius: 50%; 
+      background: rgba(255,255,255,0.3); 
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: 2px solid rgba(255,255,255,0.1);
+    }
+    .carousel-dot.active { 
+      background: #FF6B6B !important; 
+      transform: scale(1.3);
+      box-shadow: 0 0 15px rgba(255, 107, 107, 0.8);
+      border-color: #FF6B6B;
+    }
+    
+    /* Auto-play indicator */
+    .autoplay-indicator {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      width: 8px; height: 8px;
+      background: #FF6B6B;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+      z-index: 20;
+      box-shadow: 0 0 10px rgba(255, 107, 107, 0.6);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.2); }
+    }
+
+    /* Drag hint */
+    .drag-hint {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
+    }
   </style>
 </head>
-<body class="bg-base-100 min-h-screen">
+<body class="bg-black text-white min-h-screen">
   <!-- Top nav -->
   <header class="navbar bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] shadow-lg">
     <div class="flex-1">
@@ -48,10 +121,8 @@
     <section class="hero-wrap hero-fallback relative rounded-2xl overflow-hidden min-h-[70vh]">
       <!-- Single source of truth for the image -->
       <picture>
-        <!-- Mobile first -->
         <source srcset="/images/hero-bg-mobile.webp" type="image/webp" media="(max-width: 640px)">
         <source srcset="/images/hero-bg-mobile.jpg"  type="image/jpeg" media="(max-width: 640px)">
-        <!-- Desktop -->
         <source srcset="/images/hero-bg.webp" type="image/webp">
         <img
           src="/images/hero-bg.jpg"
@@ -62,168 +133,169 @@
         />
       </picture>
 
-      <!-- Dark overlay for text legibility -->
+      <!-- Dark overlay -->
       <div class="hero-overlay absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.55))]"></div>
 
-      <!-- Copy -->
-      <div class="relative z-10 grid place-items-center text-center text-white p-8 md:p-14 lg:p-16">
-        <div class="max-w-3xl">
-          <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight drop-shadow">
+      <!-- HERO CONTENT -->
+      <div class="relative z-10 grid place-items-center text-center text-white p-8 md:p-14 lg:p-16 h-full">
+        <div class="max-w-4xl space-y-6">
+          <!-- Main Headline -->
+          <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight drop-shadow-lg">
             Date, Chat & Meet New People
           </h1>
-          <p class="mt-4 md:mt-5 text-lg md:text-xl opacity-90 leading-relaxed">
-            Join a vibrant community celebrating culture, chemistry, and real conversations.
-            Matches that spark. Stories that last.
+
+          <!-- BOLD AFROVIBE STATEMENT -->
+          <div class="mt-8 md:mt-10">
+            <h2 class="text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-none
+                       bg-gradient-to-r from-[#FF6B6B] via-[#FECA57] to-[#FF9A56]
+                       bg-clip-text text-transparent
+                       drop-shadow-2xl
+                       animate-pulse-slow">
+              AfroVibe.
+            </h2>
+            <p class="text-4xl md:text-6xl lg:text-7xl font-black text-white drop-shadow-2xl -mt-3 md:-mt-4">
+              Start Your Vibe.
+            </p>
+          </div>
+
+          <!-- Subline -->
+          <p class="mt-6 text-lg md:text-xl opacity-90 leading-relaxed max-w-2xl mx-auto font-medium">
+            No games. No filters. Just real connections that feel like home.
           </p>
 
-          <div class="mt-6 md:mt-8 flex items-center justify-center gap-3 md:gap-4">
-            <a href="/signup" class="btn btn-primary btn-rounded btn-lg">Get started</a>
-            <a href="/about" class="btn btn-outline btn-rounded btn-lg text-white border-white hover:bg-white/10">
-              Learn more
+          <!-- CTA Buttons -->
+          <div class="mt-8 flex items-center justify-center gap-4">
+            <a href="/signup" class="btn btn-primary btn-lg btn-rounded text-lg">Get Started Now</a>
+            <a href="/about" class="btn btn-outline btn-lg btn-rounded text-white border-white hover:bg-white/10">
+              Learn More
             </a>
           </div>
 
-          <div class="mt-8 md:mt-10 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm opacity-90">
-            <div class="rounded-xl bg-white/10 backdrop-blur p-3">
-              <div class="text-2xl font-semibold">50k+</div>
-              <div>Active members</div>
+          <!-- Stats -->
+          <div class="mt-10 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div class="rounded-xl bg-white/15 backdrop-blur-md p-4 border border-white/20">
+              <div class="text-3xl font-bold">50k+</div>
+              <div>Active Members</div>
             </div>
-            <div class="rounded-xl bg-white/10 backdrop-blur p-3">
-              <div class="text-2xl font-semibold">4.8★</div>
-              <div>Community rating</div>
+            <div class="rounded-xl bg-white/15 backdrop-blur-md p-4 border border-white/20">
+              <div class="text-3xl font-bold">4.8★</div>
+              <div>Community Rating</div>
             </div>
-            <div class="rounded-xl bg-white/10 backdrop-blur p-3 col-span-2 md:col-span-1">
-              <div class="text-2xl font-semibold">Daily</div>
-              <div>New connections</div>
+            <div class="rounded-xl bg-white/15 backdrop-blur-md p-4 border border-white/20 col-span-2 md:col-span-1">
+              <div class="text-3xl font-bold">Daily</div>
+              <div>New Connections</div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Community Images Section like Bumble's profile images -->
-    <section class="mt-10 md:mt-14">
-      <h2 class="text-3xl font-bold text-center mb-6">Real Connections in Every Moment</h2>
-      <div class="carousel carousel-center max-w-full p-4 space-x-4 bg-neutral rounded-box">
-        <!-- Rooftop Images -->
-        <div class="carousel-item">
-          <img src="https://media.istockphoto.com/id/1483048640/photo/rear-view-silhouettes-of-a-couple-sitting-on-the-top-of-the-hill-looking-and-pointing-out-at.jpg?s=612x612&w=0&k=20&c=pjpR94-OWJJICEVtarzNF7t4toC4A0e8oTFUKwxpZB0=" alt="Couple on rooftop at night" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://media.istockphoto.com/id/502892941/photo/couple-sit-under-strars.jpg?s=612x612&w=0&k=20&c=0fCZ9loUUX42EgLCG5IEZQfYDrR_FZSXRbsvszqQaYU=" alt="Couple under stars on rooftop" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://www.shutterstock.com/image-photo/romantic-couple-kissing-city-600nw-232553956.jpg" alt="Romantic couple kissing on rooftop" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://media.istockphoto.com/id/532169765/photo/winter-romance.jpg?s=612x612&w=0&k=20&c=oO6Puh74_x3e1uJtZ7UekVz9Jn1fSmCxTQfL5LqUAkM=" alt="Winter romance on rooftop" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://media.istockphoto.com/id/1136610093/photo/happy-couple-exploring-chinatown-in-downtown-los-angeles-at-night.jpg?s=612x612&w=0&k=20&c=kyrMY9qjm8EWJkeCWso13qq1WEBSHz9xL_4Ea6v5qes=" alt="Couple in Chinatown at night" class="rounded-box w-96" />
+    <!-- 🔥 INTERACTIVE CAROUSEL 🔥 -->
+        <!-- Community Images Section like Bumble's profile images -->
+    <section class="mt-16 md:mt-20">
+      <h2 class="text-3xl md:text-4xl font-bold text-center mb-8 text-white">
+        Real Connections in <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Every Moment</span>
+      </h2>
+
+      <!-- BUMBLE-STYLE INFINITE CAROUSEL -->
+      <div class="relative overflow-hidden">
+        <div class="carousel carousel-center w-full gap-4 p-4 bg-black/30 backdrop-blur-xl rounded-3xl border border-white/10">
+          
+          <!-- IMAGE SET 1 -->
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1516589178581-6cd7838eb79e?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1511699656952-34342bb7c2f2?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1505840717430-882ce147ef2d?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+
+          <!-- IMAGE SET 2 (REPEAT FOR INFINITE FLOW) -->
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1517457373958-b7bdd458720a?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1519345182560-3f2917c472ef?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=500&h=600&fit=crop" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+
+          <!-- YOUR AI IMAGES (ADD HERE) -->
+          <div class="carousel-item">
+            <img src="/images/baris1.jpg" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="/images/baris2.jpg" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
+          <div class="carousel-item">
+            <img src="/images/baris3.jpg" class="w-96 h-50 object-cover rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300" />
+          </div>
         </div>
 
-        <!-- Beach Images -->
-        <div class="carousel-item">
-          <img src="https://media.gettyimages.com/id/911490824/photo/diverse-couple-walking-on-beach-at-sunset.jpg?s=1024x1024&w=gi&k=20&c=gb8odwdbg7hHA_JcXIYPnxc9fxr9qUzL-Ff5GWLaQNI=" alt="Couple walking on beach at sunset" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://images.pond5.com/diverse-couple-walks-beach-together-footage-105828027_iconl.jpeg" alt="Couple on honeymoon beach walk" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://thumbs.dreamstime.com/b/romantic-sunset-beach-couple-stands-hand-hand-vibrant-colors-sky-reflect-water-nature-image-344671063.jpg" alt="Couple at serene sunset beach" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://www.shutterstock.com/shutterstock/videos/1027012352/thumb/1.jpg?ip=x480" alt="Interracial couple on beach" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://thumbs.dreamstime.com/b/romantic-couple-walks-hand-hand-along-serene-beach-sunset-vibrant-colors-create-dreamy-atmosphere-love-image-344178116.jpg" alt="Couple walking hand in hand on beach" class="rounded-box w-96" />
-        </div>
+        <!-- 🖱️ MOUSE DRAG INDICATOR -->
+      <div class="text-center mt-4 text-sm opacity-70">🖱️ Drag to explore • Click images to feel the vibe</div>
 
-        <!-- Coffee Shop Images -->
-        <div class="carousel-item">
-          <img src="https://www.brides.com/thmb/4p_fhuJuupuxPygafhdNDyYS9nE=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/couple-coffee-date-facebook-getty-09-05-ae6c1139f5884a67beb829204d54807c.jpg" alt="Couple on coffee date" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://www.shutterstock.com/image-photo/happy-young-couple-near-window-600nw-1481326778.jpg" alt="Couple near window with coffee" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://www.brides.com/thmb/LZdpW-blfZ_BEeaoHwAcsmZSRMM=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/GettyImages-1283029138-0e23750e3de84aa3b6259643c2022cc8.jpg" alt="Couple enjoying coffee" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://www.shutterstock.com/image-photo/side-view-portrait-happy-couple-600nw-789737422.jpg" alt="Happy couple with coffee" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://www.shutterstock.com/image-photo/happy-young-couple-cups-near-600w-1473434480.jpg" alt="Couple drinking tea on rainy day" class="rounded-box w-96" />
-        </div>
+      <!-- 🔴 AUTO-PLAY INDICATOR -->
+      <div class="autoplay-indicator"></div>
 
-        <!-- Picnic Images -->
-        <div class="carousel-item">
-          <img src="https://www.shutterstock.com/image-photo/diverse-couple-sitting-closely-on-260nw-2650264077.jpg" alt="Diverse couple on picnic" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://media.istockphoto.com/id/992023444/photo/beautiful-diverse-couple-having-picnic-in-park.jpg?s=170667a&w=0&k=20&c=bwcAoXP3totsMRh_mySCam_haEgvSvNZhCvFZMvz088=" alt="Couple having picnic in park" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://st5.depositphotos.com/1518767/65441/i/1600/depositphotos_654411630-stock-photo-image-happy-diverse-couple-having.jpg" alt="Happy couple on autumn picnic" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://www.shutterstock.com/image-photo/happy-diverse-couple-enjoying-outdoor-260nw-2683962047.jpg" alt="Couple enjoying outdoor picnic" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://thumbs.dreamstime.com/b/happy-diverse-couple-sitting-blanket-having-picnic-drinking-juice-sunny-garden-copy-space-outdoors-expression-leisure-love-298917078.jpg" alt="Couple on blanket picnic" class="rounded-box w-96" />
-        </div>
+      <!-- ⚫ INTERACTIVE DOTS -->
+      <div class="carousel-dots" id="carouselDots"></div>
+    </div>
+  </section>
 
-        <!-- Hiking Images -->
-        <div class="carousel-item">
-          <img src="https://media.istockphoto.com/id/1340530091/photo/forest-walk-and-camping-adventures.jpg?s=612x612&w=0&k=20&c=S85TPVvB8tsDDs8igMfasJRy8NFjEfhXLUwJK-ldwBs=" alt="Couple hiking in forest" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://photos.peopleimages.com/picture/202208/2497294-hiking-diversity-and-couple-taking-a-selfie-with-a-phone-while-they-smile-happy-and-travel-in-nature-forest.-trekking-love-and-romance-on-adventure-journey-date-with-trees-earth-and-leaf-growth-fit_400_400.jpg" alt="Couple taking selfie while hiking" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://photos.peopleimages.com/picture/202302/2769683-hiking-forest-and-nature-couple-people-on-rock-for-journey-adventure-or-wellness-lifestyle-with-trees-fitness-gear-and-backpack.-trekking-relax-and-diversity-friends-travel-in-mountains-or-woods-fit_400_400.jpg" alt="Couple on rock in forest" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://c8.alamy.com/comp/2GYF1MF/happy-diverse-couple-with-backpacks-hiking-in-countryside-2GYF1MF.jpg" alt="Couple trekking in sunny forest" class="rounded-box w-96" />
-        </div>
-        <div class="carousel-item">
-          <img src="https://photos.peopleimages.com/picture/202302/2769680-hiking-forest-and-nature-couple-people-on-rock-for-journey-adventure-or-wellness-lifestyle-with-trees-fitness-gear-and-backpack.-trekking-relax-and-diversity-friends-travel-in-mountains-or-woods-fit_400_400.jpg" alt="Couple relaxing on rock hike" class="rounded-box w-96" />
-        </div>
+    
+   <!-- Feature bullets -->
+<section class="mt-16 md:mt-20">
+  <div class="grid md:grid-cols-3 gap-6 md:gap-8">
+    <!-- CARD 1 -->
+    <div class="card bg-white text-black shadow-xl hover:scale-105 transition-transform duration-300 border border-gray-100">
+      <div class="card-body">
+        <div class="text-3xl">💬</div>
+        <h3 class="card-title mt-2 text-lg font-bold">Real conversations</h3>
+        <p class="text-sm opacity-90">Smart prompts and safe tools help you start and keep the vibe going.</p>
       </div>
-    </section>
+    </div>
 
-    <!-- Feature bullets -->
-    <section class="mt-10 md:mt-14">
-      <div class="grid md:grid-cols-3 gap-4 md:gap-6">
-        <div class="card bg-base-100 border shadow-sm">
-          <div class="card-body">
-            <div class="text-2xl">💬</div>
-            <h3 class="card-title mt-1">Real conversations</h3>
-            <p class="text-sm opacity-80">Smart prompts and safe tools help you start and keep the vibe going.</p>
-          </div>
-        </div>
-        <div class="card bg-base-100 border shadow-sm">
-          <div class="card-body">
-            <div class="text-2xl">🔒</div>
-            <h3 class="card-title mt-1">Safety first</h3>
-            <p class="text-sm opacity-80">Report, block, and verification options give you control and peace of mind.</p>
-          </div>
-        </div>
-        <div class="card bg-base-100 border shadow-sm">
-          <div class="card-body">
-            <div class="text-2xl">⚡</div>
-            <h3 class="card-title mt-1">Match faster</h3>
-            <p class="text-sm opacity-80">Boosts and filters help the right people find you sooner.</p>
-          </div>
-        </div>
+    <!-- CARD 2 -->
+    <div class="card bg-white text-black shadow-xl hover:scale-105 transition-transform duration-300 border border-gray-100">
+      <div class="card-body">
+        <div class="text-3xl">🔒</div>
+        <h3 class="card-title mt-2 text-lg font-bold">Safety first</h3>
+        <p class="text-sm opacity-90">Report, block, and verification options give you control and peace of mind.</p>
       </div>
-    </section>
+    </div>
+
+    <!-- CARD 3 -->
+    <div class="card bg-white text-black shadow-xl hover:scale-105 transition-transform duration-300 border border-gray-100">
+      <div class="card-body">
+        <div class="text-3xl">⚡</div>
+        <h3 class="card-title mt-2 text-lg font-bold">Match faster</h3>
+        <p class="text-sm opacity-90">Boosts and filters help the right people find you sooner.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
     <!-- CTA -->
-    <section class="mt-12 md:mt-16 text-center">
-      <h2 class="text-2xl md:text-3xl font-semibold">Ready to meet your match?</h2>
-      <p class="mt-2 opacity-80">Create a profile in under 60 seconds.</p>
-      <a href="/signup" class="btn btn-primary btn-lg btn-rounded mt-4">Join AfroVibe</a>
+    <section class="mt-16 md:mt-20 text-center">
+      <h2 class="text-3xl md:text-4xl font-bold">Ready to meet your match?</h2>
+      <p class="mt-4 text-lg opacity-80 max-w-2xl mx-auto">Create a profile in under 60 seconds.</p>
+      <a href="/signup" class="btn btn-primary btn-lg btn-rounded mt-6 text-lg px-8">Join AfroVibe Now</a>
     </section>
   </main>
 
@@ -232,5 +304,57 @@
       <p>&copy; <%= new Date().getFullYear() %> AfroVibe. All rights reserved.</p>
     </div>
   </footer>
+
+  <!-- 🔥 INTERACTIVE CAROUSEL JAVASCRIPT 🔥 -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const carousel = document.getElementById('interactiveCarousel');
+      const images = carousel.querySelectorAll('.carousel-item img');
+      const dotsContainer = document.getElementById('carouselDots');
+      
+      // Create navigation dots
+      images.forEach((_, index) => {
+        const dot = document.createElement('div');
+        dot.className = 'carousel-dot';
+        dot.onclick = () => {
+          const scrollLeft = index * 450;
+          carousel.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+        };
+        dotsContainer.appendChild(dot);
+      });
+
+      // Auto-scroll
+      let scrollInterval = setInterval(() => {
+        carousel.scrollLeft += 3;
+        if (carousel.scrollLeft >= carousel.scrollWidth - carousel.clientWidth) {
+          carousel.scrollLeft = 0;
+        }
+      }, 50);
+
+      // Pause on hover
+      carousel.addEventListener('mouseenter', () => clearInterval(scrollInterval));
+      carousel.addEventListener('mouseleave', () => {
+        scrollInterval = setInterval(() => {
+          carousel.scrollLeft += 3;
+          if (carousel.scrollLeft >= carousel.scrollWidth - carousel.clientWidth) {
+            carousel.scrollLeft = 0;
+          }
+        }, 50);
+      });
+
+      // Update active dot on scroll
+      let activeDotIndex = 0;
+      carousel.addEventListener('scroll', () => {
+        const scrollLeft = carousel.scrollLeft;
+        const newIndex = Math.round(scrollLeft / 450);
+        if (newIndex !== activeDotIndex) {
+          document.querySelectorAll('.carousel-dot').forEach((dot, i) => {
+            dot.classList.toggle('active', i === newIndex);
+          });
+          activeDotIndex = newIndex;
+        }
+      });
+    });
+  </script>
 </body>
 </html>
