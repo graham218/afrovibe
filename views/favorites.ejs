@@ -1,132 +1,230 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="afrovibe">
-  <%- include('partials/head.ejs', { pageTitle: 'Favorites' }) %>
-  <body class="bg-base-100 min-h-screen flex flex-col">
+  <%- include('partials/head.ejs', {
+        pageTitle: (typeof pageTitle !== 'undefined' && pageTitle) ? pageTitle : 'Favorites'
+      }) %>
+  <body class="min-h-screen flex flex-col bg-black text-white selection:bg-rose-500/30">
 
+    <!-- Navbar (unchanged include) -->
     <%- include('partials/navbar.ejs') %>
 
-    <main class="container mx-auto p-4 flex-grow">
-      <header class="mb-6 flex items-center justify-between">
-  <div>
-    <h1 class="text-xl font-semibold">Favorites</h1>
-    <p class="opacity-70 text-xs md:text-sm">Star people you don’t want to lose. Wave to break the ice.</p>
-  </div>
-  <div class="flex items-center gap-2">
-    <% const __plan = planOf(currentUser); %>
-    <% if (__plan === 'free') { %>
-      <a href="/upgrade" class="btn btn-primary btn-sm">Upgrade</a>
-    <% } else { %>
-      <span class="badge badge-sm rounded-full <%= __plan==='elite' ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white' %> capitalize border-0">
-        <%= __plan %>
-      </span>
+
+  <!-- MAIN -->
+  <main class="relative isolation-isolate z-10 max-w-7xl mx-auto w-full px-4 md:px-6 lg:px-8 py-6 md:py-10 flex-1">
+    <!-- page-only radial background -->
+    <div aria-hidden="true"
+         class="pointer-events-none absolute inset-0 -z-10
+                bg-[radial-gradient(60%_50%_at_30%_0%,rgba(255,107,107,.12),transparent_60%),radial-gradient(60%_40%_at_90%_100%,rgba(254,202,87,.10),transparent_60%)]">
+    </div>
+
+    <!-- Header row -->
+    <section class="mb-6 md:mb-8">
+      <div class="flex items-end justify-between gap-4">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">
+            <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Favorites</span>
+          </h1>
+          <p class="text-white/70 text-sm mt-1">People you starred — and who starred you.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="/dashboard" class="btn btn-sm rounded-full border-0 text-black bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">
+            Browse
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <nav class="flex items-center gap-3 mb-6 md:mb-8" role="tablist" aria-label="Favorites tabs">
+      <% const __q = (typeof query !== 'undefined' && query) ? query : {}; %>
+<% const activeTab = String((__q.tab || '')).toLowerCase(); %>
+<% const isMine = !activeTab || activeTab === 'mine'; %>
+
+<% const qMine = new URLSearchParams(Object.assign({}, __q, { tab: 'mine' })).toString(); %>
+<% const qMe   = new URLSearchParams(Object.assign({}, __q, { tab: 'me'   })).toString(); %>
+
+      <a href="/favorites?<%= qMine %>"
+         role="tab"
+         class="tab-gradient px-3 py-2 rounded-full text-sm font-semibold transition-colors hover:bg-white/10"
+         aria-selected="<%= isMine ? 'true' : 'false' %>">
+        My favorites
+        <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/10">
+          <%= (myFavorites && myFavorites.length) || 0 %>
+        </span>
+      </a>
+
+      <a href="/favorites?<%= qMe %>"
+         role="tab"
+         class="tab-gradient px-3 py-2 rounded-full text-sm font-semibold transition-colors hover:bg-white/10"
+         aria-selected="<%= !isMine ? 'true' : 'false' %>">
+        Favorited me
+        <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/10">
+          <%= (favoritedMe && favoritedMe.length) || 0 %>
+        </span>
+      </a>
+    </nav>
+
+    <!-- Collections -->
+    <% function photo0(u){ 
+         try { 
+           const p = (u && u.profile && Array.isArray(u.profile.photos) && u.profile.photos[0]) || '';
+           return p ? (p.startsWith('/') ? p : ('/' + p)) : '/images/default-avatar.png';
+         } catch { return '/images/default-avatar.png'; }
+       } %>
+
+    <% function place(u){
+         const arr = [u?.profile?.city, u?.profile?.country].filter(Boolean);
+         return arr.length ? arr.join(', ') : '—';
+       } %>
+
+    <!-- Grid helper -->
+    <% function card(u){ %>
+      <article
+        class="glass glass-hover rounded-3xl overflow-hidden border border-white/10 transition-all duration-300 hover:scale-[1.02]"
+        data-user-id="<%= u._id %>"
+        data-href="/users/<%= u._id %>"
+        tabindex="0"
+        role="link"
+        aria-label="Open <%= u.username %>'s profile">
+
+        <!-- Photo -->
+        <div class="relative group">
+          <img src="<%= photo0(u) %>" alt="<%= u.username %> photo"
+               class="w-full aspect-[4/5] object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+
+          <!-- favorite star -->
+          <button
+            class="btn btn-ghost btn-xs absolute top-2 right-2 rounded-full shadow-sm favorite-toggle
+                   <%= u.isFavorite ? 'text-yellow-400' : 'text-white' %> bg-black/50 backdrop-blur border border-white/10"
+            data-user-id="<%= u._id %>"
+            data-id="<%= u._id %>"
+            aria-pressed="<%= u.isFavorite ? 'true' : 'false' %>"
+            title="<%= u.isFavorite ? 'Unfavorite' : 'Favorite' %>">
+            <span class="text-lg leading-none">★</span>
+            <span class="sr-only"><%= u.isFavorite ? 'Unfavorite' : 'Favorite' %></span>
+          </button>
+
+          <!-- photo count chip (if multiple) -->
+          <% const photosArr = Array.isArray(u?.profile?.photos) ? u.profile.photos : []; %>
+          <% if (photosArr.length > 1) { %>
+            <a href="/users/<%= u._id %>#photos"
+               class="absolute bottom-2 left-2 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium
+                      bg-black/70 backdrop-blur border border-white/10 shadow open-photos"
+               title="View photos"
+               data-user-id="<%= u._id %>"
+               data-username="<%= u.username %>"
+               data-photos='<%- JSON.stringify(photosArr).replace(/</g,"\\u003c") %>'>
+              <svg viewBox="0 0 24 24" class="w-4 h-4 opacity-90" aria-hidden="true">
+                <path fill="currentColor" d="M12 8.9a3.1 3.1 0 1 0 0 6.2a3.1 3.1 0 0 0 0-6.2m7-2.4h-2.6l-1.2-1.6c-.2-.2-.4-.4-.7-.4H9.5c-.3 0-.5.2-.7.4L7.6 6.5H5a2 2 0 0 0-2 2V17a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a2 2 0 0 0-2-2Z"/>
+              </svg>
+              <span><%= photosArr.length %> photos</span>
+            </a>
+          <% } %>
+        </div>
+
+        <!-- Body -->
+        <div class="p-3">
+          <div class="flex items-center gap-2">
+            <h3 class="text-[16px] font-semibold leading-tight truncate">
+              <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent"><%= u.username %></span>
+              <span class="opacity-80">, <%= u.profile?.age || '—' %></span>
+            </h3>
+
+            <% if (u.verifiedAt) { %>
+              <span class="badge badge-xs border-0 text-white bg-white/10">Verified</span>
+            <% } %>
+          </div>
+
+          <div class="text-xs opacity-70 mt-1 flex items-center gap-1">
+            <svg viewBox="0 0 24 24" class="w-4 h-4 opacity-80" aria-hidden="true">
+              <path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 4.97 6.07 11.37 6.33 11.64a1 1 0 0 0 1.34 0C12.93 20.37 19 13.97 19 9a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/>
+            </svg>
+            <span><%= place(u) %></span>
+          </div>
+
+          <!-- Actions -->
+          <div class="mt-3 grid grid-cols-3 gap-2">
+            <button
+              class="btn btn-xs rounded-full border-0 text-black bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl wave-btn"
+              data-user-id="<%= u._id %>"
+              data-id="<%= u._id %>"
+              data-username="<%= u.username %>">
+              👋 <span class="ml-1">Wave</span>
+            </button>
+
+            <a class="btn btn-xs btn-ghost rounded-full border-white/20" href="/users/<%= u._id %>">
+              View
+            </a>
+
+            <button
+              class="btn btn-xs rounded-full border-0 text-black bg-gradient-to-r from-[#FECA57] to-[#FF6B6B] hover:shadow-xl favorite-toggle"
+              data-user-id="<%= u._id %>"
+              data-id="<%= u._id %>"
+              aria-pressed="<%= u.isFavorite ? 'true' : 'false' %>"
+              title="<%= u.isFavorite ? 'Unfavorite' : 'Favorite' %>">
+              ★ <span class="ml-1"><%= u.isFavorite ? 'Starred' : 'Star' %></span>
+            </button>
+          </div>
+        </div>
+      </article>
     <% } %>
-  </div>
-</header>
 
-
-      <div role="tablist" class="tabs tabs-bordered mb-4">
-        <a role="tab" class="tab tab-active" href="#my">My favorites</a>
-        <a role="tab" class="tab" href="#me">Favorited me</a>
+    <!-- PANEL: My favorites -->
+    <section aria-labelledby="tab-mine" class="<%= isMine ? '' : 'hidden' %>">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 id="tab-mine" class="text-lg font-semibold">My favorites</h2>
+        <div class="text-sm text-white/60"><%= (myFavorites && myFavorites.length) || 0 %> people</div>
       </div>
 
-      <!-- My Favorites -->
-      <section id="my" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <% if (!myFavorites.length) { %>
-          <div class="col-span-full text-center opacity-60">No favorites yet. Tap ★ on profiles.</div>
-        <% } %>
-        <% myFavorites.forEach(u => { %>
-          <article class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow rounded-2xl overflow-hidden">
-  <div class="relative">
-    <img src="<%= u.profile?.photos?.[0] || '/img/placeholder.jpg' %>" class="w-full aspect-[4/5] object-cover" alt="">
-    <button class="btn btn-ghost btn-xs absolute top-2 right-2 rounded-full shadow-sm favorite-toggle <%= u.isFavorite ? 'text-yellow-500' : '' %>"
-            data-id="<%= u._id %>" title="<%= u.isFavorite ? 'Unfavorite' : 'Favorite' %>">★</button>
-    <div class="absolute top-2 left-2 space-x-1">
-      <% if (u.verifiedAt) { %>
-        <span class="badge badge-xs rounded-full bg-emerald-600 text-white border-0">Verified</span>
-      <% } %>
-    </div>
-  </div>
-  <div class="p-3">
-    <h3 class="text-[16px] font-semibold leading-tight truncate"><%= u.username %></h3>
-    <div class="text-xs opacity-70 mt-1">
-      <%= u.profile?.age ? u.profile.age + ' · ' : '' %><%= [u.profile?.city, u.profile?.country].filter(Boolean).join(', ') %>
-    </div>
-    <div class="mt-3 flex items-center gap-2">
-      <button class="btn btn-xs btn-outline wave-btn" data-id="<%= u._id %>" <%= u.iWaved ? 'disabled' : '' %>>
-        👋 <span class="ml-1"><%= u.iWaved ? 'Waved' : 'Wave' %></span>
-      </button>
-      <a class="btn btn-xs btn-ghost" href="/users/<%= u._id %>">View</a>
-      <a class="btn btn-xs btn-primary" href="/chat/<%= u._id %>">Message</a>
-    </div>
-  </div>
-</article>
-        <% }) %>
-      </section>
-
-      <!-- Favorited Me -->
-      <section id="me" class="mt-10">
-        <div class="mb-2 font-semibold">People who favorited you</div>
-
-        <% const locked = (planOf(currentUser) === 'free'); %>
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 relative">
-          <% if (!favoritedMe.length) { %>
-            <div class="col-span-full text-center opacity-60">No one has favorited you yet.</div>
-          <% } %>
-
-          <% favoritedMe.forEach(u => { %>
-            <article class="card bg-base-100 shadow border border-base-200 relative">
-              <% if (locked) { %>
-                <div class="absolute inset-0 z-10 backdrop-blur-sm bg-base-100/40 flex items-center justify-center">
-                  <div class="text-center">
-                    <div class="text-sm opacity-70 mb-2">Upgrade to see who favorited you</div>
-                    <a href="/upgrade" class="btn btn-primary btn-sm">Upgrade</a>
-                  </div>
-                </div>
-              <% } %>
-              <figure class="aspect-[4/5] overflow-hidden">
-                <img src="<%= u.profile?.photos?.[0] || '/img/placeholder.jpg' %>" class="w-full h-full object-cover" alt="">
-              </figure>
-              <div class="card-body p-3">
-                <div class="flex items-center gap-2">
-                  <h3 class="font-semibold truncate"><%= u.username %></h3>
-                  <% if (u.verifiedAt) { %><span class="badge badge-info">Verified</span><% } %>
-                </div>
-                <div class="text-xs opacity-70">
-                  <%= u.profile?.age ? u.profile.age + ' · ' : '' %><%= [u.profile?.city, u.profile?.country].filter(Boolean).join(', ') %>
-                </div>
-
-                <div class="card-actions mt-3 grid grid-cols-2 gap-2">
-                  <!-- Favorite toggle -->
-                  <button
-                    class="btn btn-ghost btn-sm favorite-toggle <%= u.isFavorite ? 'text-yellow-500' : '' %>"
-                    data-id="<%= u._id %>"
-                    title="<%= u.isFavorite ? 'Unfavorite' : 'Favorite' %>">
-                    ★ <span class="ml-1"><%= u.isFavorite ? 'Favorited' : 'Favorite' %></span>
-                  </button>
-
-                  <!-- Wave -->
-                  <button
-                    class="btn btn-outline btn-sm wave-btn"
-                    data-id="<%= u._id %>"
-                    <%= u.iWaved ? 'disabled' : '' %>>
-                    👋 <span class="ml-1"><%= u.iWaved ? 'Waved' : 'Wave' %></span>
-                  </button>
-                </div>
-
-                <div class="mt-2 flex gap-2">
-                  <a class="btn btn-ghost btn-2xs" href="/users/<%= u._id %>">View</a>
-                  <a class="btn btn-primary btn-2xs" href="/chat/<%= u._id %>">Message</a>
-                </div>
-              </div>
-            </article>
-          <% }) %>
+      <% if (!myFavorites || myFavorites.length === 0) { %>
+        <div class="glass rounded-3xl p-8 text-center">
+          <div class="text-3xl mb-2">☆</div>
+          <h3 class="text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">No favorites yet</h3>
+          <p class="text-white/70 mt-1">Star people you like and they’ll appear here.</p>
+          <a href="/dashboard" class="mt-4 inline-flex btn rounded-full border-0 text-black bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">Discover people</a>
         </div>
-      </section>
-    </main>
+      <% } else { %>
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <% myFavorites.forEach(function(u){ %>
+            <% card(u); %>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
 
+    <!-- PANEL: Favorited me -->
+    <section aria-labelledby="tab-me" class="<%= isMine ? 'hidden' : '' %> mt-10">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 id="tab-me" class="text-lg font-semibold">Favorited me</h2>
+        <div class="text-sm text-white/60"><%= (favoritedMe && favoritedMe.length) || 0 %> people</div>
+      </div>
+
+      <% if (!favoritedMe || favoritedMe.length === 0) { %>
+        <div class="glass rounded-3xl p-8 text-center">
+          <div class="text-3xl mb-2 animate-pulse">★</div>
+          <h3 class="text-xl font-semibold bg-gradient-to-r from-[#FECA57] to-[#FF6B6B] bg-clip-text text-transparent">No one has starred you (yet)</h3>
+          <p class="text-white/70 mt-1">Keep swiping, waving, and saying hello — your star is coming.</p>
+          <a href="/dashboard" class="mt-4 inline-flex btn rounded-full border-0 text-black bg-gradient-to-r from-[#FECA57] to-[#FF6B6B] hover:shadow-xl">Meet new people</a>
+        </div>
+      <% } else { %>
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <% favoritedMe.forEach(function(u){ %>
+            <% card(u); %>
+          <% }); %>
+        </div>
+      <% } %>
+    </section>
+  </main>
+
+  <!-- Footer (stays readable on dark) -->
     <%- include('partials/footer.ejs') %>
 
-    <script nonce="<%= cspNonce %>" src="/js/socket.helper.js" defer></script>
-    <script nonce="<%= cspNonce %>" src="/js/page-favorites.js" defer></script>
-  </body>
+  <!-- Hidden fields some scripts rely on -->
+  <input type="hidden" id="currentUserId" value="<%= String(currentUser && currentUser._id || '') %>" />
+
+  <!-- Your existing bundles (no inline events to satisfy CSP) -->
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="/js/socket.helper.js" defer></script>
+  <script src="/js/dashboard.js" defer></script>
+</body>
 </html>

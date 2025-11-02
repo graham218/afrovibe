@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="afrovibe">
+  <%- include('partials/head', { pageTitle: pageTitle || 'Success Stories' }) %>
+<body class="bg-black text-white min-h-screen flex flex-col">
+  <%- include('partials/navbar') %>
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+    <h1 class="text-3xl font-bold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Success Stories</h1>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <% ;(new Array(6)).fill(0).forEach((_,i)=>{ %>
+        <article class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 p-6 hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition">
+          <div class="text-white/90">“We matched on AfroVibe and met a week later. The rest is history.”</div>
+          <div class="mt-3 text-xs text-white/60">Nairobi • Couple <%= i+1 %></div>
+        </article>
+      <% }) %>
+    </div>
+  </main>
+  <%- include('partials/footer') %>
+</body>
+</html>

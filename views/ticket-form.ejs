@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="afrovibe">
+<head>
+  <meta charset="utf-8" />
+  <title><%= pageTitle || 'Support' %> — AfroVibe</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen bg-black text-white flex flex-col">
+  <% include ./navbar.ejs %>
+
+  <main class="flex-1 max-w-3xl mx-auto w-full px-4 md:px-6 lg:px-8 py-10 relative">
+    <!-- soft page aura -->
+    <div aria-hidden="true"
+         class="pointer-events-none absolute inset-0 -z-10 opacity-70
+                bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.08),transparent_60%),radial-gradient(60%_40%_at_80%_100%,rgba(254,202,87,.08),transparent_60%)]"></div>
+
+    <header class="mb-6">
+      <h1 class="text-3xl font-extrabold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+        <%= heading || 'Support' %>
+      </h1>
+      <p class="text-white/70 mt-1"><%= sub || '' %></p>
+    </header>
+
+    <section class="card bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]">
+      <div class="card-body space-y-5">
+        <form id="ticketForm" class="space-y-4" method="post" action="/api/tickets">
+          <input type="hidden" name="type" value="<%= kind %>">
+
+          <% if (kind === 'report') { %>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="form-control">
+                <span class="label-text text-white/80">User ID (optional)</span>
+                <input class="input input-bordered bg-black/40 border-white/20 text-white"
+                       name="targetUser" value="<%= targetUser || '' %>">
+              </label>
+              <label class="form-control">
+                <span class="label-text text-white/80">Username (optional)</span>
+                <input class="input input-bordered bg-black/40 border-white/20 text-white"
+                       name="targetUsername" value="<%= targetUsername || '' %>">
+              </label>
+              <label class="form-control sm:col-span-2">
+                <span class="label-text text-white/80">URL (optional)</span>
+                <input class="input input-bordered bg-black/40 border-white/20 text-white"
+                       name="targetUrl" value="<%= targetUrl || '' %>" placeholder="/users/abc123">
+              </label>
+            </div>
+          <% } %>
+
+          <% if (!currentUser) { %>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="form-control">
+                <span class="label-text text-white/80">Your name</span>
+                <input class="input input-bordered bg-black/40 border-white/20 text-white" name="reporterName">
+              </label>
+              <label class="form-control">
+                <span class="label-text text-white/80">Email</span>
+                <input type="email" class="input input-bordered bg-black/40 border-white/20 text-white" name="reporterEmail" required>
+              </label>
+            </div>
+          <% } %>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="form-control">
+              <span class="label-text text-white/80">Category (optional)</span>
+              <input class="input input-bordered bg-black/40 border-white/20 text-white" name="category" placeholder="Safety, Billing, Bug…">
+            </label>
+            <label class="form-control">
+              <span class="label-text text-white/80">Subject (optional)</span>
+              <input class="input input-bordered bg-black/40 border-white/20 text-white" name="subject" maxlength="200">
+            </label>
+          </div>
+
+          <label class="form-control">
+            <span class="label-text text-white/80">Message</span>
+            <textarea class="textarea textarea-bordered bg-black/40 border-white/20 text-white min-h-[140px]"
+                      name="message" required placeholder="Tell us a bit more…"></textarea>
+          </label>
+
+          <div class="flex justify-end">
+            <button class="btn rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">
+              Submit
+            </button>
+          </div>
+        </form>
+
+        <div id="ticketToast" class="hidden alert alert-success bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-2xl">
+          Thanks! We received your message.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <% include ./footer.ejs %>
+
+  <script>
+    // fetch submit (keeps you on-page with a toast)
+    const f = document.getElementById('ticketForm');
+    const toast = document.getElementById('ticketToast');
+    f?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(f);
+      const body = Object.fromEntries(fd.entries());
+      const res = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify(body)
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && j.ok) {
+        toast?.classList.remove('hidden');
+        f.reset();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        alert(j.message || 'Could not submit right now.');
+      }
+    });
+  </script>
+</body>
+</html>

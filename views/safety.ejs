@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="afrovibe">
+  <%- include('partials/head', { pageTitle: (pageTitle || 'Safety') }) %>
+<body class="bg-black text-white min-h-screen flex flex-col">
+  <%- include('partials/navbar', { currentUser }) %>
+
+  <main class="relative isolation-isolate z-10 max-w-5xl mx-auto px-4 md:px-6 lg:px-8 py-10 flex-1">
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10
+         bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.12),transparent_60%),radial-gradient(60%_40%_at_80%_100%,rgba(254,202,87,.10),transparent_60%)]"></div>
+
+    <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 p-6 md:p-8">
+      <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+        Safety
+      </h1>
+      <div class="mt-4 space-y-4 text-white/80">
+        <p>• Verify your profile to increase trust.</p>
+        <p>• Never share sensitive info. Meet in public places first.</p>
+        <p>• Use in-app tools: report, block, and photo verification.</p>
+        <p>• Our team reviews reports quickly to keep the community safe.</p>
+        <p>• We prioritize your safety and privacy.</p>
+        <p>• For emergencies, contact local authorities.</p>
+        <p>• If you feel unsafe, trust your instincts and leave.</p>
+        <p>• Always prioritize your safety and well-being.</p>
+        <p>• We are here to support you.</p>
+      </div>
+    </section>
+  </main>
+
+  <%- include('partials/footer') %>
+</body>
+</html>

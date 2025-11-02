@@ -1,5 +1,5 @@
 <!-- views/partials/navbar.ejs -->
-<div class="navbar bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] shadow-md px-3 md:px-4">
+<header class="navbar bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] shadow-md px-3 md:px-4 relative z-40 isolation-isolate">
   <!-- Left: brand + mobile menu -->
   <div class="navbar-start">
     <div class="dropdown">
@@ -10,39 +10,42 @@
         </svg>
       </label>
 
-      <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[100] p-2 shadow bg-base-100 rounded-2xl w-56">
-        <li><a href="/dashboard">Home</a></li>
+      <!-- Mobile dropdown (forced dark glass so it’s readable on every page) -->
+      <ul tabindex="0"
+          class="menu menu-sm dropdown-content mt-3 z-[200] p-2 shadow rounded-10xl w-56
+                 bg-black/95 text-white border border-white/10 backdrop-blur-xl">
+        <li><a class="hover:bg-white/10" href="/dashboard">Home</a></li>
         <li>
-          <a href="/messages">
+          <a class="hover:bg-white/10" href="/messages">
             Messages
-            <span class="badge badge-error badge-sm nav-unread-messages <%= (typeof unreadMessages !== 'undefined' && unreadMessages > 0) ? '' : 'hidden' %>">
+            <span class="badge badge-error badge-sm nav-unread-messages ml-1 <%= (typeof unreadMessages !== 'undefined' && unreadMessages > 0) ? '' : 'hidden' %>">
               <%= typeof unreadMessages !== 'undefined' && unreadMessages > 0 ? unreadMessages : '' %>
             </span>
           </a>
         </li>
-        <li><a href="/matches">Matches</a></li>
+        <li><a class="hover:bg-white/10" href="/matches">Matches</a></li>
 
         <!-- Mobile: Connections -->
         <li>
           <details>
             <summary>Connections</summary>
-            <ul class="p-2">
-              <li><a href="/likes-you">Likes You</a></li>
-              <li><a href="/favorites">Favorites</a></li>
-              <li><a href="/viewed-you">Views</a></li>
-              <li><a href="/blocked">Blocked</a></li>
+            <ul class="p-2 bg-transparent">
+              <li><a class="hover:bg-white/10" href="/likes-you">Likes You</a></li>
+              <li><a class="hover:bg-white/10" href="/favorites">Favorites</a></li>
+              <li><a class="hover:bg-white/10" href="/viewed-you">Views</a></li>
+              <li><a class="hover:bg-white/10" href="/blocked">Blocked</a></li>
             </ul>
           </details>
         </li>
 
-        <li><a href="/advanced-search">Advanced Search</a></li>
-        <li><a href="/settings">Settings</a></li>
+        <li><a class="hover:bg-white/10" href="/advanced-search">Advanced Search</a></li>
+        <li><a class="hover:bg-white/10" href="/settings">Settings</a></li>
 
         <!-- Mobile notifications entry -->
         <li class="md:hidden">
-          <a href="/notifications">
+          <a class="hover:bg-white/10" href="/notifications">
             Notifications
-            <span class="badge badge-error badge-sm nav-unread-notifs <%= (typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0) ? '' : 'hidden' %>">
+            <span class="badge badge-error badge-sm nav-unread-notifs ml-1 <%= (typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0) ? '' : 'hidden' %>">
               <%= typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0 ? unreadNotificationCount : '' %>
             </span>
           </a>
@@ -50,8 +53,8 @@
 
         <% const boostActiveMobile = currentUser && currentUser.boostExpiresAt && new Date(currentUser.boostExpiresAt) > new Date(); %>
         <% if (boostActiveMobile) { %>
-          <li class="opacity-80">
-            <a href="javascript:void(0)">
+          <li class="opacity-90">
+            <a class="hover:bg-white/10" href="javascript:void(0)">
               Boosting
               <span id="boostCountdownMobile" class="ml-1 font-mono text-xs"
                     data-expires="<%= new Date(currentUser.boostExpiresAt).toISOString() %>">--:--</span>
@@ -59,16 +62,16 @@
           </li>
         <% } %>
 
-        <li><a href="/logout">Logout</a></li>
+        <li><a class="hover:bg-white/10" href="/logout">Logout</a></li>
       </ul>
     </div>
 
     <a href="/dashboard" class="btn btn-ghost text-xl text-black tracking-tight">🌍 AfroVibe</a>
   </div>
 
-  <!-- Center: desktop menu -->
+  <!-- Center: desktop menu (black text works over the bright gradient bar) -->
   <div class="navbar-center hidden lg:flex">
-    <ul class="menu menu-horizontal px-1 text-[15px]">
+    <ul class="menu menu-horizontal px-1 text-[20px]">
       <li><a href="/dashboard" class="text-black/95 hover:text-black">Home</a></li>
       <li>
         <a href="/messages" class="text-black/95 hover:text-black">
@@ -80,14 +83,16 @@
       </li>
       <li><a href="/matches" class="text-black/95 hover:text-black">Matches</a></li>
 
-      <!-- Desktop: Connections -->
+      <!-- Desktop: Connections (dropdown forced dark glass for readability) -->
       <li class="dropdown dropdown-hover">
         <label tabindex="0" class="text-black/95 hover:text-black">Connections</label>
-        <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-2xl w-52">
-          <li><a href="/likes-you">Likes You</a></li>
-          <li><a href="/favorites">Favorites</a></li>
-          <li><a href="/viewed-you">Views</a></li>
-          <li><a href="/blocked">Blocked</a></li>
+        <ul tabindex="0"
+            class="dropdown-content menu p-2 rounded-2xl w-52 z-[200]
+                   bg-black/95 text-white border border-white/10 backdrop-blur-xl">
+          <li><a class="hover:bg-white/10" href="/likes-you">Likes You</a></li>
+          <li><a class="hover:bg-white/10" href="/favorites">Favorites</a></li>
+          <li><a class="hover:bg-white/10" href="/viewed-you">Views</a></li>
+          <li><a class="hover:bg-white/10" href="/blocked">Blocked</a></li>
         </ul>
       </li>
 
@@ -156,35 +161,31 @@
             <img src="/images/default-avatar.png" alt="Profile" class="w-full h-full object-cover">
           <% } %>
         </div>
-
-        <% const navAvatar = typeof avatarUrl === 'string' && avatarUrl ? avatarUrl : '/images/default-avatar.png'; %>
-<div class="btn btn-ghost btn-circle avatar">
-  <div class="w-10 h-10 rounded-full ring-1 ring-white/50 overflow-hidden">
-    <img src="<%= navAvatar %>" alt="Profile" class="w-full h-full object-cover select-none">
-  </div>
-</div>
-
       </label>
-      <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[101] p-2 shadow bg-base-100 rounded-2xl w-56">
+
+      <!-- Avatar dropdown (forced dark glass) -->
+      <ul tabindex="0"
+          class="menu menu-sm dropdown-content mt-3 z-[200] p-2 shadow rounded-2xl w-56
+                 bg-black/95 text-white border border-white/10 backdrop-blur-xl">
         <li class="font-semibold px-3 py-1"><%= currentUser?.username || 'Profile' %></li>
-        <li><a href="/my-profile">My Profile</a></li>
-        <li><a href="/edit-profile">Edit Profile</a></li>
-        <li><a href="/photos">Manage Photos</a></li>
-        <li><a href="/settings">Settings</a></li>
+        <li><a class="hover:bg-white/10" href="/my-profile">My Profile</a></li>
+        <li><a class="hover:bg-white/10" href="/edit-profile">Edit Profile</a></li>
+        <li><a class="hover:bg-white/10" href="/photos">Manage Photos</a></li>
+        <li><a class="hover:bg-white/10" href="/settings">Settings</a></li>
         <% if (boostActive) { %>
-          <li class="opacity-80">
-            <a href="javascript:void(0)">
+          <li class="opacity-90">
+            <a class="hover:bg-white/10" href="javascript:void(0)">
               Boosting
               <span id="boostCountdownMenu" class="ml-1 font-mono text-xs"
                     data-expires="<%= new Date(currentUser.boostExpiresAt).toISOString() %>">--:--</span>
             </a>
           </li>
         <% } %>
-        <li><a href="/logout">Logout</a></li>
+        <li><a class="hover:bg-white/10" href="/logout">Logout</a></li>
       </ul>
     </div>
   </div>
-</div>
+</header>
 
 <!-- Sockets: load once (official client) + your helper + global nav logic -->
 <script src="/socket.io/socket.io.js" defer></script>

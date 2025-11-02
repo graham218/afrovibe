@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="afrovibe">
+  <%- include('partials/head', { pageTitle: pageTitle || 'Report a Concern' }) %>
+<body class="bg-black text-white min-h-screen flex flex-col">
+  <%- include('partials/navbar') %>
+  <main class="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+    <h1 class="text-3xl font-bold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Report a Concern</h1>
+    <form method="post" action="/report" class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 p-6 space-y-4">
+      <label class="form-control">
+        <span class="label-text text-white/80">Subject</span>
+        <input name="subject" class="input input-bordered bg-black/40 border-white/20 text-white" required>
+      </label>
+      <label class="form-control">
+        <span class="label-text text-white/80">Details</span>
+        <textarea name="details" rows="5" class="textarea textarea-bordered bg-black/40 border-white/20 text-white" required></textarea>
+      </label>
+      <button class="btn rounded-full text-black bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">Send Report</button>
+      <% if (String(req?.query?.sent||'')==='1') { %>
+        <p class="text-emerald-400 mt-2">Thanks! We’ll review shortly.</p>
+      <% } %>
+    </form>
+  </main>
+  <%- include('partials/footer') %>
+</body>
+</html>

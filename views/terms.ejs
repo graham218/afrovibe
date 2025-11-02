@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="afrovibe">
+  <%- include('partials/head', { pageTitle: (pageTitle || 'Terms') }) %>
+<body class="bg-black text-white min-h-screen flex flex-col">
+  <%- include('partials/navbar', { currentUser }) %>
+
+  <main class="relative isolation-isolate z-10 max-w-5xl mx-auto px-4 md:px-6 lg:px-8 py-10 flex-1">
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10
+         bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.12),transparent_60%),radial-gradient(60%_40%_at_80%_100%,rgba(254,202,87,.10),transparent_60%)]"></div>
+
+    <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 p-6 md:p-8 prose prose-invert max-w-none">
+      <h1 class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Terms of Service</h1>
+      <p>Last updated: <%= new Date().toISOString().slice(0,10) %></p>
+      <h2>1. Acceptance of Terms</h2>
+      <p>By using AfroVibe, you agree to these Terms.</p>
+      <h2>2. Eligibility</h2>
+      <p>You must be 18+ and comply with local laws.</p>
+      <h2>3. Conduct</h2>
+      <ul>
+        <li>No harassment, scams, or illegal activity.</li>
+        <li>No spam or fake profiles.</li>
+      </ul>
+      <h2>4. Subscriptions</h2>
+      <p>Paid plans are billed as shown at checkout.</p>
+      <h2>5. Changes</h2>
+      <p>We may update these Terms; continued use equals acceptance.</p>
+    </section>
+  </main>
+
+  <%- include('partials/footer') %>
+</body>
+</html>

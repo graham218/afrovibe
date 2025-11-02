@@ -1,107 +1,192 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="afrovibe">
 <%- include('partials/head.ejs', { pageTitle: 'Settings' }) %>
-<body class="bg-base-100 min-h-screen flex flex-col" data-me="<%= currentUser?._id %>">
+<body class="bg-black text-white min-h-screen flex flex-col relative">
+
+  <!-- page-only ambient backdrop (won’t touch navbar/footer) -->
+  <div aria-hidden="true"
+       class="pointer-events-none absolute inset-0 -z-10
+              bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.12),transparent_60%),radial-gradient(60%_40%_at_80%_100%,rgba(254,202,87,.10),transparent_60%)]">
+  </div>
+
   <%- include('partials/navbar.ejs') %>
 
-  <main class="container mx-auto p-4 flex-grow max-w-3xl">
-    <h1 class="text-3xl font-bold mb-2">Account Settings</h1>
-    <p class="opacity-70 mb-6">Manage your account preferences and privacy.</p>
+  <!-- MAIN -->
+  <main class="container mx-auto flex-grow max-w-3xl px-4 md:px-6 lg:px-8 py-8 md:py-12 relative z-10">
 
-    <!-- Quick links -->
-    <div class="grid md:grid-cols-3 gap-3 mb-8">
-      <a href="/settings/email" class="btn btn-block">Email Settings</a>
-      <a href="/settings/password" class="btn btn-block">Password</a>
-      <a href="/settings/billing" class="btn btn-block">Billing</a>
-    </div>
-    <!-- ... your settings page body ... -->
+    <!-- Page header -->
+    <header class="mb-6 md:mb-8">
+      <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
+        <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Account Settings</span>
+      </h1>
+      <p class="mt-2 text-sm opacity-80">Manage your account preferences and privacy.</p>
+    </header>
 
-<!-- Buttons -->
-<section class="card bg-base-100 border shadow">
-  <div class="card-body">
-    <h2 class="card-title">Account</h2>
-    <p class="text-sm opacity-70">Deactivate (reversible) or delete (permanent) your account.</p>
+    <!-- Quick links (glass buttons) -->
+    <section class="grid md:grid-cols-3 gap-3 md:gap-4 mb-8">
+      <a href="/settings/email"
+         class="btn btn-sm md:btn-md rounded-full border border-white/10 bg-black/70 backdrop-blur-xl text-black
+                hover:shadow-xl hover:scale-[1.02] transition-all duration-200">
+        Email Settings
+      </a>
+      <a href="/settings/password"
+         class="btn btn-sm md:btn-md rounded-full border border-white/10 bg-black/70 backdrop-blur-xl text-black
+                hover:shadow-xl hover:scale-[1.02] transition-all duration-200">
+        Password Change
+      </a>
+      <a href="/settings/billing"
+         class="btn btn-sm md:btn-md rounded-full border border-white/10 bg-black/70 backdrop-blur-xl text-black
+                hover:shadow-xl hover:scale-[1.02] transition-all duration-200">
+        Billing
+      </a>
+    </section>
 
-    <div class="mt-3 flex gap-2">
-      <button id="deactivateBtn" class="btn btn-outline">Deactivate account</button>
-      <button id="deleteBtn" class="btn btn-error">Delete account</button>
-    </div>
-  </div>
-</section>
+    <!-- Account section card -->
+    <section class="card bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]
+                    hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+      <div class="card-body p-5 md:p-6">
+        <div class="flex items-center gap-2">
+          <svg viewBox="0 0 24 24" class="w-5 h-5 text-white/80" aria-hidden="true">
+            <path fill="currentColor" d="M12 2a6 6 0 0 1 6 6v1h1a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3h1V8a6 6 0 0 1 6-6m0 2a4 4 0 0 0-4 4v1h8V8a4 4 0 0 0-4-4Z"/>
+          </svg>
+          <h2 class="card-title text-white">Account</h2>
+        </div>
+        <p class="text-sm opacity-80">Deactivate (reversible) or delete (permanent) your account.</p>
 
-<!-- Deactivate dialog -->
-<dialog id="deactivateDialog" class="modal">
-  <div class="modal-box">
-    <h3 class="font-semibold text-lg">Deactivate account</h3>
-    <p class="text-sm opacity-70 mt-1">Your profile will be hidden. You can log back in later to reactivate.</p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button id="deactivateBtn"
+                  class="btn btn-sm rounded-full border-white/20 text-black
+                         hover:!bg-white/10 hover:!border-white/30 transition-all">
+            Deactivate account
+          </button>
 
-    <form id="deactivateForm" class="mt-4">
-      <label class="form-control">
-        <span class="label-text">Reason (optional)</span>
-        <select name="reason" class="select select-bordered">
-          <option value="">Select…</option>
-          <option value="break">Taking a break</option>
-          <option value="found_match">Found someone</option>
-          <option value="privacy">Privacy concerns</option>
-          <option value="other">Other</option>
-        </select>
-      </label>
-      <label class="form-control mt-3">
-        <span class="label-text">Details (optional)</span>
-        <textarea name="details" rows="3" class="textarea textarea-bordered" placeholder="Anything we should know?"></textarea>
-      </label>
-
-      <div class="mt-5 flex justify-end gap-2">
-        <button type="button" class="btn btn-ghost" id="deactivateCancel">Cancel</button>
-        <button type="submit" class="btn btn-outline">Deactivate</button>
+          <button id="deleteBtn"
+                  class="btn btn-sm rounded-full text-black border-0
+                         bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]
+                         hover:shadow-xl hover:scale-[1.02] transition-all">
+            Delete account
+          </button>
+        </div>
       </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
+    </section>
 
-<!-- Delete dialog -->
-<dialog id="deleteDialog" class="modal">
-  <div class="modal-box">
-    <h3 class="font-semibold text-lg text-error">Delete account</h3>
-    <p class="text-sm opacity-80 mt-1">
-      This will permanently remove your profile, photos and matches. This action cannot be undone.
-    </p>
+    <!-- (You can insert more settings tiles here using same glass card pattern) -->
 
-    <form id="deleteForm" class="mt-4">
-      <label class="form-control">
-        <span class="label-text">Reason (optional)</span>
-        <select name="reason" class="select select-bordered">
-          <option value="">Select…</option>
-          <option value="not_helpful">Didn’t find what I wanted</option>
-          <option value="too_many_msgs">Too many messages</option>
-          <option value="privacy">Privacy concerns</option>
-          <option value="other">Other</option>
-        </select>
-      </label>
-      <label class="form-control mt-3">
-        <span class="label-text">Details (optional)</span>
-        <textarea name="details" rows="3" class="textarea textarea-bordered" placeholder="Optional details…"></textarea>
-      </label>
+    <!-- Deactivate dialog -->
+    <dialog id="deactivateDialog" class="modal">
+      <div class="modal-box max-w-md bg-black/70 backdrop-blur-2xl border border-white/10 rounded-3xl text-black">
+        <h3 class="font-semibold text-lg">
+          <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Deactivate account</span>
+        </h3>
+        <p class="text-sm opacity-80 mt-1">
+          Your profile will be hidden. You can log back in later to reactivate.
+        </p>
 
-      <label class="form-control mt-4">
-        <span class="label-text">Type <b>DELETE</b> to confirm</span>
-        <input name="confirm" class="input input-bordered" placeholder="DELETE" />
-      </label>
+        <form id="deactivateForm" class="mt-4 space-y-3">
+          <label class="form-control">
+            <span class="label-text text-white/80">Reason (optional)</span>
+            <select name="reason" class="select select-bordered bg-black/40 border-white/20 text-black">
+              <option value="">Select…</option>
+              <option value="break">Taking a break</option>
+              <option value="found_match">Found someone</option>
+              <option value="privacy">Privacy concerns</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
 
-      <div class="mt-5 flex justify-end gap-2">
-        <button type="button" class="btn btn-ghost" id="deleteCancel">Cancel</button>
-        <button type="submit" class="btn btn-error">Delete permanently</button>
+          <label class="form-control">
+            <span class="label-text text-white/80">Details (optional)</span>
+            <textarea name="details" rows="3"
+                      class="textarea textarea-bordered bg-black/40 border-white/20 text-black"
+                      placeholder="Anything we should know?"></textarea>
+          </label>
+
+          <div class="pt-2 flex justify-end gap-2">
+            <button type="button"
+                    class="btn btn-ghost rounded-full text-white/80 hover:bg-white/10"
+                    id="deactivateCancel">
+              Cancel
+            </button>
+            <button type="submit"
+                    class="btn rounded-full text-black border-0
+                           bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]
+                           hover:shadow-xl">
+              Deactivate
+            </button>
+          </div>
+        </form>
       </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
+      <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
 
-<!-- Add this ONE external script include (no inline JS needed) -->
-<script src="/js/settings.js" defer></script>
+    <!-- Delete dialog -->
+    <dialog id="deleteDialog" class="modal">
+      <div class="modal-box max-w-md bg-black/70 backdrop-blur-2xl border border-white/10 rounded-3xl text-black">
+        <h3 class="font-semibold text-lg text-white">
+          <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Delete account</span>
+        </h3>
+        <p class="text-sm opacity-90 mt-1">
+          This will permanently remove your profile, photos and matches. This action cannot be undone.
+        </p>
+
+        <form id="deleteForm" class="mt-4 space-y-3">
+          <label class="form-control">
+            <span class="label-text text-white/80">Reason (optional)</span>
+            <select name="reason" class="select select-bordered bg-black/40 border-white/20 text-black">
+              <option value="">Select…</option>
+              <option value="not_helpful">Didn’t find what I wanted</option>
+              <option value="too_many_msgs">Too many messages</option>
+              <option value="privacy">Privacy concerns</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+
+          <label class="form-control">
+            <span class="label-text text-white/80">Details (optional)</span>
+            <textarea name="details" rows="3"
+                      class="textarea textarea-bordered bg-black/40 border-white/20 text-black"
+                      placeholder="Optional details…"></textarea>
+          </label>
+
+          <label class="form-control">
+            <span class="label-text text-white/80">Type <b>DELETE</b> to confirm</span>
+            <input name="confirm"
+                   class="input input-bordered bg-black/40 border-white/20 text-black"
+                   placeholder="DELETE" />
+          </label>
+
+          <div class="pt-2 flex justify-end gap-2">
+            <button type="button"
+                    class="btn btn-ghost rounded-full text-white/80 hover:bg-white/10"
+                    id="deleteCancel">
+              Cancel
+            </button>
+
+            <button type="submit"
+                    class="btn rounded-full text-black border-0
+                           bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]
+                           hover:shadow-xl">
+              Delete permanently
+            </button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+
+    <!-- Back to profile (optional quick nav) -->
+    <div class="mt-8">
+      <a href="/my-profile"
+         class="btn btn-sm rounded-full border-white/10 bg-black/60 backdrop-blur-xl text-black
+                hover:shadow-xl hover:scale-[1.02] transition-all">
+        ← Back to Profile
+      </a>
+    </div>
+
+    <!-- Page JS (unchanged) -->
+    <script src="/js/settings.js" defer></script>
   </main>
 
-  <%- include('partials/footer.ejs') %> 
+  <%- include('partials/footer.ejs') %>
 </body>
 </html>

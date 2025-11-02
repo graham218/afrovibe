@@ -240,9 +240,7 @@ const User = require('./models/User');
 const Message = require('./models/Message');
 const Report = require('./models/Report');
 const Notification = require('./models/Notification'); // Ensure Notification model is required
-const Post = require('./models/Post');
-const Comment = require('./models/Comment');
-const Quiz = require('./models/Quiz');
+const Ticket = require('./models/Ticket');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -292,6 +290,30 @@ mongoose.connection.once('open', async () => {
 
 mongoose.connection.on('error', err => console.error('Mongo error:', err && err.message ? err.message : err));
 mongoose.connection.on('disconnected', () => console.warn('Mongo disconnected'));
+
+// very small per-IP throttle for ticket posts
+const ticketHits = new Map();
+function ticketThrottle(req, res, next) {
+  const key = (req.ip || 'ip') + '|' + (req.session?.userId || 'guest');
+  const now = Date.now();
+  const windowMs = 60_000; // 1 minute
+  const max = 4;           // 4 requests/min
+
+  const arr = ticketHits.get(key)?.filter(t => now - t < windowMs) || [];
+  arr.push(now);
+  ticketHits.set(key, arr);
+  if (arr.length > max) return res.status(429).json({ ok: false, message: 'Too many requests. Try again shortly.' });
+  next();
+}
+function pickTrim(obj, keys) {
+  const out = {};
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (v == null) continue;
+    out[k] = typeof v === 'string' ? v.trim() : v;
+  }
+  return out;
+}
 
 
 // Unread messages (respects soft-delete)
@@ -1386,6 +1408,143 @@ app.get('/api/rtc/config', checkAuth, (req, res) => {
   res.json({ iceServers, rtc: { iceServers } });
 });
 
+// --- Static info pages (footer) ---
+const staticPages = [
+  { path: '/how-it-works',          view: 'how-it-works',          title: 'How It Works' },
+  { path: '/success-stories',       view: 'success-stories',       title: 'Success Stories' },
+  { path: '/blog',                  view: 'blog',                  title: 'Blog' },
+  { path: '/events',                view: 'events',                title: 'AfroVibe Events' },
+  { path: '/help',                  view: 'help',                  title: 'Help Center' },
+  { path: '/safety',                view: 'safety',                title: 'Safety Tips' },
+  { path: '/community-guidelines',  view: 'community-guidelines',  title: 'Community Guidelines' },
+  { path: '/terms',                 view: 'terms',                 title: 'Terms of Service' },
+  { path: '/privacy',               view: 'privacy',               title: 'Privacy Policy' },
+  { path: '/cookies',               view: 'cookies',               title: 'Cookie Policy' },
+];
+
+staticPages.forEach(({ path, view, title }) => {
+  app.get(path, async (req, res) => {
+    res.render(view, {
+      pageTitle: title,
+      currentUser: req.user || null
+    });
+  });
+});
+
+
+// Contact: POST (handles form submit)
+app.post('/contact', express.urlencoded({ extended: true }), async (req, res) => {
+  try {
+    const { name = '', email = '', message = '' } = req.body;
+    // TODO: send email or store in DB
+    console.log('[CONTACT]', { name, email, message, userId: req.session?.userId || null });
+    // Redirect with flag to avoid resubmits
+    return res.redirect('/contact?sent=1');
+  } catch (e) {
+    console.error('contact err', e);
+    return res.status(500).render('error', { status: 500, message: 'Could not send your message.' });
+  }
+});
+
+// Helper: allow pages to render even if not logged in
+function checkAuthOptional(req, _res, next) {
+  // If you already set req.user in another middleware, keep using that.
+  // Otherwise mildly hydrate from session:
+  req.user = req.user || (req.session?.userId ? { _id: req.session.userId } : null);
+  next();
+}
+
+app.post('/report', async (req, res) => {
+  try {
+    const { subject = '', details = '' } = req.body || {};
+    // TODO: persist to DB or notify moderators
+    console.log('REPORT', { subject, details, userId: req.session?.userId });
+    res.redirect('/report?sent=1');
+  } catch (e) {
+    console.error('report err', e);
+    res.redirect('/report?error=1');
+  }
+});
+
+// Help Center (general)
+app.get('/help', (req, res) => {
+  res.render('ticket-form', {
+    pageTitle: 'Help Center',
+    kind: 'help',
+    heading: 'Help Center',
+    sub: 'Ask a question or get assistance.',
+    currentUser: req.user,
+  });
+});
+
+// Report a Concern
+app.get('/report', (req, res) => {
+  // you can pass ?user=<id>&username=...&url=...
+  res.render('ticket-form', {
+    pageTitle: 'Report a Concern',
+    kind: 'report',
+    heading: 'Report a Concern',
+    sub: 'Tell us what happened so we can keep AfroVibe safe.',
+    targetUser: req.query.user || '',
+    targetUsername: req.query.username || '',
+    targetUrl: req.query.url || '',
+    currentUser: req.user,
+  });
+});
+
+// server.js
+app.get('/contact', (req, res) => {
+  res.render('ticket-form', {
+    pageTitle: 'Contact Us',
+    kind: 'contact',
+    heading: 'Contact Us',
+    sub: 'Business, press, or general messages. We read everything.',
+    currentUser: req.user,
+  });
+});
+
+
+// Create a ticket
+app.post('/api/tickets', ticketThrottle, async (req, res) => {
+  try {
+    const kind = String(req.body.type || '').toLowerCase();
+    if (!['contact','report','help'].includes(kind)) {
+      return res.status(400).json({ ok: false, message: 'Invalid ticket type.' });
+    }
+
+    const base = pickTrim(req.body, [
+      'subject', 'category', 'message', 'reporterEmail', 'reporterName',
+      'targetUser', 'targetUsername', 'targetUrl'
+    ]);
+
+    if (!base.message || base.message.length < 5) {
+      return res.status(400).json({ ok: false, message: 'Please include a brief message.' });
+    }
+
+    const doc = new Ticket({
+      type: kind,
+      ...base,
+      reporter: req.session?.userId || undefined,
+      meta: {
+        ua: req.headers['user-agent'],
+        ip: req.ip,
+        referer: req.headers['referer'],
+      }
+    });
+
+    await doc.save();
+
+    // Optional: notify admins (if you have a Notification model)
+    // await Notification.create({ recipient: ADMIN_ID, kind: 'ticket', data: { ticketId: doc._id } });
+
+    return res.json({ ok: true, id: String(doc._id) });
+  } catch (e) {
+    console.error('ticket create error', e);
+    return res.status(500).json({ ok: false, message: 'Could not submit right now.' });
+  }
+});
+
+
 // Canonical: /profile simply redirects to /my-profile
 app.get('/profile', (req, res) => res.redirect(301, '/my-profile'));
 
@@ -1670,7 +1829,32 @@ app.post('/edit-profile', checkAuth, async (req, res) => {
   }
 });
 
+// POST /photos/set-primary/:idx
+app.post('/photos/set-primary/:idx', checkAuth, async (req, res) => {
+  try {
+    const me = await User.findById(req.session.userId).select('profile.photos').exec();
+    if (!me || !me.profile || !Array.isArray(me.profile.photos)) {
+      return res.status(400).json({ ok: false, message: 'No photos to update.' });
+    }
 
+    const idx = Math.max(0, Math.min(Number(req.params.idx || 0), me.profile.photos.length - 1));
+    if (!me.profile.photos[idx]) {
+      return res.status(404).json({ ok: false, message: 'Photo not found.' });
+    }
+
+    // Move chosen to front (index 0)
+    const arr = me.profile.photos.slice();
+    const [chosen] = arr.splice(idx, 1);
+    arr.unshift(chosen);
+    me.profile.photos = arr;
+    await me.save();
+
+    return res.json({ ok: true, message: 'Profile photo set.', primary: chosen });
+  } catch (e) {
+    console.error('set-primary err', e);
+    return res.status(500).json({ ok: false, message: 'Failed to set profile photo.' });
+  }
+});
 
 app.get('/photos', checkAuth, async (req, res) => {
   try {
@@ -2456,6 +2640,7 @@ app.get('/likes-you', checkAuth, async (req, res) => {
     const currentUser = await User.findById(meId)
       .select('isPremium plan likes likedBy blockedUsers')
       .lean();
+
     if (!currentUser) return res.redirect('/login');
 
     const isPremium = !!currentUser.isPremium || (currentUser.plan && currentUser.plan !== 'free');
@@ -2467,7 +2652,7 @@ app.get('/likes-you', checkAuth, async (req, res) => {
       .map(String)
       .filter(uid => !myLikesSet.has(uid))
       .filter(uid => !blockedSet.has(uid))
-      .reverse(); // newest first if likedBy is chronological
+      .reverse();
 
     // paging
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
@@ -2481,19 +2666,27 @@ app.get('/likes-you', checkAuth, async (req, res) => {
       'profile.age': 1, 'profile.city': 1, 'profile.country': 1, 'profile.photos': 1
     };
 
-    const peopleDoc = slice.length
-  ? await User.find({ _id: { $in: slice }, ...isActiveUserQuery() })
-      .select('username verifiedAt lastActive profile.photos profile.age profile.city profile.country')
-      .lean()
-  : [];
+    // Safe fallback if isActiveUserQuery() isn’t defined
+    const activeCond = (typeof isActiveUserQuery === 'function')
+      ? isActiveUserQuery()
+      : {}; // e.g. { profile: { $exists: true } }
 
-    // restore the original order of `slice`
+    const peopleDocs = slice.length
+      ? await User.find({ _id: { $in: slice }, ...activeCond })
+          .select(projection)
+          .lean()
+      : [];
+
+    // restore the original `slice` order
     const order = new Map(slice.map((id, i) => [String(id), i]));
     const people = peopleDocs.sort(
       (a, b) => (order.get(String(a._id)) ?? 0) - (order.get(String(b._id)) ?? 0)
     );
 
-    const revealed = canRevealLikesToday(req, isPremium);
+    // Can this user see likers today?
+    const revealed = (typeof canRevealLikesToday === 'function')
+      ? canRevealLikesToday(req, isPremium)
+      : true; // if your helper is missing, default to revealed
 
     const [unreadMessages, unreadNotificationCount] = await Promise.all([
       Message.countDocuments({
@@ -2511,7 +2704,7 @@ app.get('/likes-you', checkAuth, async (req, res) => {
       pageTitle: 'Who Liked You',
       currentUser: { _id: meId, isPremium },
       people,
-      usersWhoLikedMe: people,   // alias for older EJS
+      usersWhoLikedMe: people,            // legacy alias, used by your EJS
       blurred: !revealed,
       justRevealed: req.query.revealed === '1' || justRevealed,
       pageMeta: { page, limit, total, totalPages: Math.max(Math.ceil(total / limit), 1) },
@@ -2888,112 +3081,147 @@ app.get('/settings/password', checkAuth, fetchUserAndCounts, (req, res) => {
   });
 });
 
-// Route for billing settings
-app.get('/settings/billing', checkAuth, fetchUserAndCounts, (req, res) => {
-  res.render('billing-settings', { 
-    unreadMessages: req.unreadMessages, 
-    unreadNotificationCount: req.unreadNotificationCount,
-    currentUser: req.currentUser,
-    error: null, // Pass an initial value for the error variable
-    success: null // Pass an initial value for the success variable
+// ---- GET: Forgot password (renders a simple page) ----
+app.get('/forgot', async (req, res) => {
+  try {
+    return res.render('forgot', {
+      pageTitle: 'Forgot Password',
+      // You can carry flash-y messages via query if you want
+      message: req.query.message || ''
+    });
+  } catch (e) {
+    console.error('forgot get err', e);
+    return res.status(500).render('error', { status: 500, message: 'Failed to load Forgot Password.' });
+  }
+});
+
+// ---- POST: Forgot password (stub that "pretends" to send reset mail) ----
+app.post('/forgot', async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    if (!email) {
+      // render same page with an error; keep it simple
+      return res.status(400).render('forgot', {
+        pageTitle: 'Forgot Password',
+        message: 'Please enter your email.'
+      });
+    }
+
+    // Optional: look up user. Do not leak whether an email exists.
+    // const u = await User.findOne({ 'emails.primary': email }) || await User.findOne({ email });
+    // Queue email with token here in a real build.
+
+    // UX: always say we sent something.
+    return res.render('forgot', {
+      pageTitle: 'Forgot Password',
+      message: 'If an account exists for that email, we just sent a reset link.'
+    });
+  } catch (e) {
+    console.error('forgot post err', e);
+    return res.status(500).render('forgot', {
+      pageTitle: 'Forgot Password',
+      message: 'Something went wrong. Please try again.'
+    });
+  }
+});
+
+// ---- POST: Update password (used by password-settings.ejs) ----
+app.post('/update-password', checkAuth, async (req, res) => {
+  try {
+    const userId          = req.session.userId;
+    const currentPassword = String(req.body.currentPassword || '').trim();
+    const newPassword     = String(req.body.newPassword || '').trim();
+    const confirmPassword = String(req.body.confirmPassword || '').trim();
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ ok: false, message: 'Please fill in all fields.' });
+    }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ ok: false, message: 'Passwords do not match.' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ ok: false, message: 'New password must be at least 8 characters.' });
+    }
+
+    const user = await User.findById(userId).select('+passwordHash +password'); // adapt to your schema
+    if (!user) return res.status(401).json({ ok: false, message: 'Not authenticated.' });
+
+    // Adapt to your field names. Prefer passwordHash if present.
+    const storedHash = user.passwordHash || user.password; // many schemas store at `password`
+    if (!storedHash) {
+      return res.status(400).json({ ok: false, message: 'Password not set on this account.' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, storedHash);
+    if (!isMatch) {
+      return res.status(400).json({ ok: false, message: 'Current password is incorrect.' });
+    }
+
+    const SALT_ROUNDS = 10;
+    const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    // Save back to whichever field you actually use:
+    if (user.passwordHash !== undefined) user.passwordHash = newHash;
+    else user.password = newHash;
+
+    await user.save();
+
+    // Optional: rotate session
+    // req.session.regenerate(() => { ... });
+
+    return res.json({ ok: true, success: true, message: 'Password updated.' });
+  } catch (e) {
+    console.error('update-password err', e);
+    return res.status(500).json({ ok: false, message: 'Server error while updating password.' });
+  }
+});
+
+// --- Smart Billing entrypoint ---
+// Free users -> /upgrade
+// Subscribers -> Stripe Customer Portal (if configured) or a simple "manage" page later
+app.get(['/billing','/settings/billing'], checkAuth, async (req, res) => {
+  const user = await User.findById(req.session.userId)
+    .select('stripeCustomerId stripeSubscriptionId plan isPremium')
+    .lean();
+  if (!user) return res.redirect('/login');
+
+  const hasSub =
+    !!user.stripeSubscriptionId ||
+    user.plan === 'silver' ||
+    user.plan === 'emerald' ||
+    user.isPremium;
+
+  if (!hasSub) {
+    return res.redirect(302, '/upgrade?from=billing');
+  }
+
+  // If you have Stripe portal configured, bounce them there immediately:
+  // (Otherwise, keep them on /billing and render your future manage page)
+  return res.redirect(302, '/billing-portal');
+});
+
+// --- Stripe Billing Portal jump ---
+app.post('/billing-portal', checkAuth, async (req, res) => {
+  const user = await User.findById(req.session.userId).select('stripeCustomerId').lean();
+  if (!user?.stripeCustomerId) return res.redirect('/upgrade?from=billing');
+
+  const session = await stripe.billingPortal.sessions.create({
+    customer: user.stripeCustomerId,
+    return_url: `${req.protocol}://${req.get('host')}/settings`,
   });
+  res.redirect(303, session.url);
 });
 
-// Route to get the community hub page
-app.get('/community', checkAuth, async (req, res) => {
-    try {
-        const currentUserId = req.session.userId;
-        const currentUser = await User.findById(currentUserId);
-        
-        // Fetch all posts and populate the author field to get the username
-        const posts = await Post.find().populate('author').sort({ createdAt: -1 });
+// Convenience GET to avoid needing a form on the client
+app.get('/billing-portal', checkAuth, async (req, res) => {
+  const user = await User.findById(req.session.userId).select('stripeCustomerId').lean();
+  if (!user?.stripeCustomerId) return res.redirect('/upgrade?from=billing');
 
-        res.render('community', { currentUser: currentUser, posts: posts });
-    } catch (err) {
-        console.error('Error fetching community posts:', err);
-        res.status(500).send('Server Error');
-    }
-});
-
-// Route to create a new post
-app.post('/community/create-post', checkAuth, async (req, res) => {
-    try {
-        const { title, content } = req.body;
-        const currentUserId = req.session.userId;
-
-        const newPost = new Post({
-            author: currentUserId,
-            title,
-            content
-        });
-
-        await newPost.save();
-        
-        res.redirect('/community');
-    } catch (err) {
-        console.error('Error creating post:', err);
-        res.status(500).send('Server Error');
-    }
-});
-
-// Route to get a single post and its comments
-app.get('/community/post/:id', checkAuth, async (req, res) => {
-    try {
-        const postId = req.params.id;
-        const currentUserId = req.session.userId;
-        const currentUser = await User.findById(currentUserId);
-        
-        // Find the post and populate both the author and the comments
-        const post = await Post.findById(postId)
-            .populate('author')
-            .populate({
-                path: 'comments',
-                populate: {
-                    path: 'author'
-                }
-            });
-
-        if (!post) {
-            return res.status(404).send('Post not found.');
-        }
-
-        res.render('post', { currentUser, post });
-    } catch (err) {
-        console.error('Error fetching post and comments:', err);
-        res.status(500).send('Server Error');
-    }
-});
-
-// Route to create a new comment on a post
-app.post('/community/post/:id/comment', checkAuth, async (req, res) => {
-    try {
-        const postId = req.params.id;
-        const { content } = req.body;
-        const currentUserId = req.session.userId;
-
-        const post = await Post.findById(postId);
-        if (!post) {
-            return res.status(404).json({ status: 'error', message: 'Post not found.' });
-        }
-
-        const newComment = new Comment({
-            author: currentUserId,
-            post: postId,
-            content
-        });
-
-        await newComment.save();
-        
-        // Add the new comment to the post's comments array
-        post.comments.push(newComment._id);
-        await post.save();
-
-        res.redirect(`/community/post/${postId}`);
-
-    } catch (err) {
-        console.error('Error creating comment:', err);
-        res.status(500).json({ status: 'error', message: 'Server error' });
-    }
+  const session = await stripe.billingPortal.sessions.create({
+    customer: user.stripeCustomerId,
+    return_url: `${req.protocol}://${req.get('host')}/settings`,
+  });
+  res.redirect(303, session.url);
 });
 
 
@@ -3765,13 +3993,21 @@ app.delete('/favorite/:id',
 // --- PAGE: Favorites hub (my favorites + favorited me) ---
 app.get('/favorites', checkAuth, async (req, res) => {
   try {
-    const meId  = req.session.userId;
+    const meId  = String(req.session.userId);
     const meObj = new mongoose.Types.ObjectId(meId);
 
     const currentUser = await User.findById(meId)
-      .select('favorites waved isPremium profile username')
+      .select('favorites waved isPremium plan profile username')
       .lean();
+
     if (!currentUser) return res.redirect('/login');
+
+    // helper used by favorites.ejs
+    const planOf = (u) => {
+      // adjust if you have more precise plan mapping
+      if (u?.plan && u.plan !== 'free') return String(u.plan).toLowerCase();
+      return u?.isPremium ? 'emerald' : 'free';
+    };
 
     const favoriteSet = new Set((currentUser.favorites || []).map(String));
     const wavedSet    = new Set((currentUser.waved || []).map(String));
@@ -3786,13 +4022,21 @@ app.get('/favorites', checkAuth, async (req, res) => {
       'profile.photos': 1,
     };
 
-    // My favorites (I starred them)
+    // --- My favorites (I starred them)
     let myFavorites = [];
     if ((currentUser.favorites || []).length) {
-      const ids = currentUser.favorites.map(id => new mongoose.Types.ObjectId(id));
+      const ids = currentUser.favorites
+        .filter(Boolean)
+        .map(id => new mongoose.Types.ObjectId(id));
+
       const list = await User.find({ _id: { $in: ids } })
         .select(projection)
         .lean();
+
+      // keep original order by ids
+      const pos = new Map(ids.map((id, i) => [String(id), i]));
+      list.sort((a, b) => (pos.get(String(a._id)) ?? 0) - (pos.get(String(b._id)) ?? 0));
+
       myFavorites = list.map(u => ({
         ...u,
         isFavorite: true,
@@ -3800,27 +4044,25 @@ app.get('/favorites', checkAuth, async (req, res) => {
       }));
     }
 
-    // Favorited me (people who starred me)
+    // --- Favorited me (people who starred me)
     const whoFavoritedMe = await User.find({ favorites: meObj })
       .select(projection)
       .lean();
+
     const favoritedMe = (whoFavoritedMe || []).map(u => ({
       ...u,
       isFavorite: favoriteSet.has(String(u._id)),
-      iWaved: wavedSet.has(String(u._id)),
+      iWaved:     wavedSet.has(String(u._id)),
     }));
 
-    const favorites = favIds.length
-  ? await User.find({ _id: { $in: favIds }, ...isActiveUserQuery() })
-      .select('username verifiedAt lastActive profile.photos profile.age profile.city profile.country')
-      .lean()
-  : [];
-
-    // navbar counts
+    // navbar badges
     const [unreadMessages, unreadNotificationCount] = await Promise.all([
       Message.countDocuments({ recipient: meObj, read: false, deletedFor: { $nin: [meObj] } }),
       Notification.countDocuments({ recipient: meObj, read: false }),
     ]);
+
+    // ✅ IMPORTANT: remove the stray block that referenced favIds + isActiveUserQuery()
+    // (That block caused the 500.)
 
     return res.render('favorites', {
       currentUser,
@@ -3828,14 +4070,15 @@ app.get('/favorites', checkAuth, async (req, res) => {
       favoritedMe,
       unreadMessages,
       unreadNotificationCount,
+      query: req.query || {},
+      // pass helper so favorites.ejs can call planOf(currentUser)
+      planOf,
     });
   } catch (err) {
     console.error('favorites page err', err);
     return res.status(500).render('error', { status: 500, message: 'Failed to load favorites.' });
   }
 });
-
-
 
 // DISLIKE a user
 app.post('/dislike/:id', checkAuth, dislikeLimiter, validateObjectId('id'), validate, async (req, res) => {

@@ -1,129 +1,194 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="afrovibe">
   <%- include('partials/head.ejs', { pageTitle: 'Who Liked You' }) %>
-  <body class="bg-base-100 min-h-screen flex flex-col">
+  <body class="bg-black text-white min-h-screen flex flex-col selection:bg-rose-400/30 selection:text-white">
+    <!-- Navbar stays above any page overlay -->
     <%- include('partials/navbar.ejs') %>
 
-    <main class="container mx-auto p-4 flex-grow">
-  <input type="hidden" id="currentUserId" value="<%= currentUser._id %>">
+    <!-- Page content (isolated so gradients don’t touch navbar/footer) -->
+    <main class="relative isolation-isolate flex-grow">
+      <!-- Subtle page background glow -->
+      <div aria-hidden="true"
+           class="pointer-events-none absolute inset-0 -z-10
+                  bg-[radial-gradient(60%_45%_at_20%_0%,rgba(255,107,107,.14),transparent_60%),radial-gradient(70%_50%_at_90%_100%,rgba(254,202,87,.12),transparent_60%)]"></div>
 
-  <!-- Header + actions (Reveal / Upgrade) -->
-  <header class="mb-6 flex items-center justify-between">
-    <div>
-      <h1 class="text-xl md:text-2xl font-semibold">Who Liked You</h1>
-      <p class="opacity-70 text-xs md:text-sm">Like back to create a match and start chatting.</p>
-    </div>
+      <div class="container mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+        <input type="hidden" id="currentUserId" value="<%= currentUser._id %>">
 
-    <% 
-      // --- SAFE GUARDS ---
-      const list = Array.isArray(usersWhoLikedMe) ? usersWhoLikedMe
-                 : Array.isArray(users)          ? users
-                 : Array.isArray(likers)         ? likers
-                 : [];
-      const _blurred       = typeof blurred !== 'undefined' ? !!blurred : false;
-      const _justRevealed  = typeof justRevealed !== 'undefined' ? !!justRevealed : false;
-    %>
+        <!-- Header + actions (Reveal / Upgrade) -->
+        <header class="mb-6 flex items-center justify-between">
+          <div>
+            <h1 class="text-xl md:text-2xl font-semibold">
+              <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Who Liked You</span>
+            </h1>
+            <p class="opacity-80 text-xs md:text-sm">Like back to create a match and start chatting.</p>
+          </div>
 
-    <% if (_blurred) { %>
-      <form method="post" action="/likes-you/reveal" class="flex items-center gap-2">
-        <button class="btn btn-accent btn-sm" type="submit">Reveal (1 free today)</button>
-        <a href="/upgrade" class="btn btn-primary btn-sm">Upgrade to unlock all</a>
-      </form>
-    <% } else { %>
-      <div class="flex items-center gap-2">
-        <% if (_justRevealed) { %>
-          <span class="badge badge-success">Unlocked today 🎉</span>
-        <% } else { %>
-          <span class="badge badge-success">Unlocked</span>
-        <% } %>
-        <a href="/upgrade" class="btn btn-ghost btn-sm">Manage plan</a>
-      </div>
-    <% } %>
-  </header>
+          <%
+            // --- SAFE GUARDS (kept exactly) ---
+            const list = Array.isArray(usersWhoLikedMe) ? usersWhoLikedMe
+                       : Array.isArray(users)          ? users
+                       : Array.isArray(likers)         ? likers
+                       : [];
+            const _blurred       = typeof blurred !== 'undefined' ? !!blurred : false;
+            const _justRevealed  = typeof justRevealed !== 'undefined' ? !!justRevealed : false;
+          %>
 
-  <% if (list.length) { %>
-    <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-      <% list.forEach(liker => { 
-           const photo = (liker?.profile?.photos?.[0]) || '/images/default-avatar.png';
-      %>
-        <article class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow rounded-2xl relative">
           <% if (_blurred) { %>
-            <div class="absolute inset-0 z-10 backdrop-blur-sm bg-base-100/40 flex items-center justify-center">
-              <div class="text-center">
-                <div class="text-xs opacity-70 mb-2">Reveal to see details</div>
-                <form method="post" action="/likes-you/reveal">
-                  <button class="btn btn-accent btn-xs" type="submit">Reveal (1 free today)</button>
-                </form>
-                <a href="/upgrade" class="btn btn-ghost btn-2xs mt-2">Upgrade to unlock all</a>
-              </div>
+            <form method="post" action="/likes-you/reveal" class="flex items-center gap-2">
+              <button class="btn btn-sm rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl" type="submit">
+                Reveal (1 free today)
+              </button>
+              <a href="/upgrade"
+                 class="btn btn-sm rounded-full text-black border-0 bg-gradient-to-r from-[#FECA57] to-[#FF6B6B] hover:shadow-xl">
+                Upgrade to unlock all
+              </a>
+            </form>
+          <% } else { %>
+            <div class="flex items-center gap-2">
+              <% if (_justRevealed) { %>
+                <span class="badge badge-success badge-sm rounded-full border-0 bg-emerald-500/20 text-emerald-300 animate-pulse">Unlocked today 🎉</span>
+              <% } else { %>
+                <span class="badge badge-success badge-sm rounded-full border-0 bg-emerald-500/20 text-emerald-300">Unlocked</span>
+              <% } %>
+              <a href="/upgrade" class="btn btn-ghost btn-sm rounded-full border border-white/10 hover:bg-white/10">
+                Manage plan
+              </a>
             </div>
           <% } %>
+        </header>
 
-          <figure class="relative overflow-hidden">
-            <img src="<%= photo %>" alt="<%= liker?.username || '' %>" class="w-full aspect-[4/5] object-cover">
-            <div class="absolute left-2 top-2 flex gap-1">
-              <% if (liker?.verifiedAt) { %><span class="badge badge-success badge-xs rounded-full">Verified</span><% } %>
-              <% if (liker?.lastActive && (Date.now()-new Date(liker.lastActive).getTime()<5*60*1000)) { %>
-                <span class="badge badge-info badge-xs rounded-full">Online</span>
-              <% } %>
+        <% if (list.length) { %>
+          <!-- Grid of likers -->
+          <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <% list.forEach(liker => {
+                 const photo = (liker?.profile?.photos?.[0]) || '/images/default-avatar.png';
+            %>
+              <article
+                class="card bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]
+                       hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition duration-300 rounded-3xl overflow-hidden relative">
+
+                <% if (_blurred) { %>
+                  <div class="absolute inset-0 z-10 backdrop-blur-md bg-black/40 flex items-center justify-center">
+                    <div class="text-center">
+                      <div class="text-xs opacity-80 mb-2">Reveal to see details</div>
+                      <form method="post" action="/likes-you/reveal">
+                        <button class="btn btn-xs rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl" type="submit">
+                          Reveal (1 free today)
+                        </button>
+                      </form>
+                      <a href="/upgrade" class="btn btn-ghost btn-2xs mt-2 rounded-full border border-white/10 hover:bg-white/10">
+                        Upgrade to unlock all
+                      </a>
+                    </div>
+                  </div>
+                <% } %>
+
+                <!-- Photo -->
+                <figure class="relative overflow-hidden group">
+                  <img src="<%= photo %>"
+                       alt="<%= liker?.username || '' %>"
+                       class="w-full aspect-[4/5] object-cover transition duration-300 group-hover:scale-105" />
+
+                  <!-- Verified / Online badges -->
+                  <div class="absolute left-2 top-2 flex items-center gap-1">
+                    <% if (liker?.verifiedAt) { %>
+                      <span class="badge badge-xs rounded-full border-0 bg-emerald-400/20 text-emerald-300">Verified</span>
+                    <% } %>
+                    <% if (liker?.lastActive && (Date.now()-new Date(liker.lastActive).getTime()<5*60*1000)) { %>
+                      <span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full
+                                   bg-emerald-400/15 text-emerald-300 border border-emerald-300/20">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        now
+                      </span>
+                    <% } %>
+                  </div>
+                </figure>
+
+                <!-- Body -->
+                <div class="p-3">
+                  <h3 class="text-[16px] font-semibold leading-tight truncate">
+                    <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+                      <%= liker?.username %>
+                    </span>
+                    <% if (liker?.profile?.age) { %>
+                      <span class="opacity-80 text-white/80"> · <%= liker.profile.age %></span>
+                    <% } %>
+                  </h3>
+
+                  <p class="text-xs opacity-80 mt-1 truncate">
+                    <%= [liker?.profile?.city, liker?.profile?.country].filter(Boolean).join(', ') %>
+                  </p>
+
+                  <div class="mt-3 grid grid-cols-2 gap-2">
+                    <!-- Keep hooks (class names) intact -->
+                    <button class="btn btn-xs like-back-btn rounded-full text-black border-0
+                                   bg-gradient-to-r from-[#FECA57] to-[#FF6B6B] hover:shadow-xl active:scale-[.98]"
+                            data-user-id="<%= liker?._id %>">
+                      💜 Like back
+                    </button>
+                    <button class="btn btn-xs btn-ghost dislike-btn rounded-full
+                                   border border-white/10 hover:bg-white/10 active:scale-[.98]"
+                            data-user-id="<%= liker?._id %>">
+                      ✖ Dislike
+                    </button>
+                  </div>
+                </div>
+              </article>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <!-- Empty state -->
+          <div class="max-w-xl mx-auto bg-black/60 backdrop-blur-xl border border-white/10 rounded-3xl p-8 text-center
+                      shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]">
+            <div class="flex justify-center mb-3">
+              <svg class="w-8 h-8 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/>
+              </svg>
             </div>
-          </figure>
+            <p class="text-white/90">No one has liked you yet. Keep discovering and you’ll show up here.</p>
 
-          <div class="p-3">
-            <h3 class="text-[16px] font-semibold leading-tight truncate">
-              <%= liker?.username %><% if (liker?.profile?.age) { %><span class="opacity-70"> · <%= liker.profile.age %></span><% } %>
-            </h3>
-            <p class="text-xs opacity-70 mt-1 truncate">
-              <%= [liker?.profile?.city, liker?.profile?.country].filter(Boolean).join(', ') %>
-            </p>
-
-            <div class="mt-3 grid grid-cols-2 gap-2">
-              <button class="btn btn-xs btn-outline like-back-btn" data-user-id="<%= liker?._id %>">💜 Like back</button>
-              <button class="btn btn-xs btn-ghost border border-base-300 dislike-btn" data-user-id="<%= liker?._id %>">✖ Dislike</button>
+            <div class="mt-4">
+              <a href="/dashboard"
+                 class="btn rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">
+                Discover people
+              </a>
             </div>
           </div>
-        </article>
-      <% }) %>
-    </div>
-  <% } else { %>
-    <div class="max-w-xl mx-auto bg-base-200 rounded-xl p-8 text-center">
-      <div class="flex justify-center mb-3">
-        <svg class="w-8 h-8 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/>
-        </svg>
+        <% } %>
       </div>
-      <p>No one has liked you yet. Keep discovering and you’ll show up here.</p>
-    </div>
-  <% } %>
-</main>
+    </main>
 
-    <!-- Match / Alert modals -->
+    <!-- Footer (stays readable on dark) -->
+    <%- include('partials/footer.ejs') %>
+
+    <!-- Modals (kept, just styled) -->
     <dialog id="alertModal" class="modal">
-      <div class="modal-box">
+      <div class="modal-box bg-black/70 backdrop-blur-2xl border border-white/10 rounded-3xl text-white">
         <h3 id="alertTitle" class="font-bold text-lg"></h3>
         <p id="alertMessage" class="py-4"></p>
         <div class="modal-action">
-          <form method="dialog"><button class="btn">Close</button></form>
+          <form method="dialog"><button class="btn rounded-full border border-white/10 hover:bg-white/10">Close</button></form>
         </div>
       </div>
     </dialog>
 
     <dialog id="matchModal" class="modal">
-      <div class="modal-box text-center">
-        <h3 class="font-bold text-lg text-success">It's a Match! 🎉</h3>
+      <div class="modal-box text-center bg-black/70 backdrop-blur-2xl border border-white/10 rounded-3xl text-white">
+        <h3 class="font-bold text-lg text-emerald-300">It's a Match! 🎉</h3>
         <p id="matchedUser" class="py-4 text-xl font-semibold"></p>
         <div class="modal-action justify-center">
-          <a href="/messages" class="btn btn-primary">Go to Messages</a>
-          <form method="dialog"><button class="btn">Keep Browsing</button></form>
+          <a href="/messages" class="btn rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">
+            Go to Messages
+          </a>
+          <form method="dialog"><button class="btn rounded-full border border-white/10 hover:bg-white/10">Keep Browsing</button></form>
         </div>
       </div>
     </dialog>
 
-    <%- include('partials/footer.ejs') %>
-
-    <!-- Scripts (CSP-safe order) -->
+    <!-- Scripts (CSP-safe order, unchanged) -->
     <script nonce="<%= cspNonce %>" src="/js/socket.helper.js" defer></script>
     <script nonce="<%= cspNonce %>" src="/js/page-likes-you.js" defer></script>
-</body>
+  </body>
 </html>

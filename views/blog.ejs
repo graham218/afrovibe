@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="afrovibe">
+  <%- include('partials/head', { pageTitle: pageTitle || 'Blog' }) %>
+<body class="bg-black text-white min-h-screen flex flex-col">
+  <%- include('partials/navbar') %>
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+    <h1 class="text-3xl font-bold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Blog</h1>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <% ;(new Array(6)).fill(0).forEach((_,i)=>{ %>
+        <a class="rounded-3xl block bg-black/60 backdrop-blur-xl border border-white/10 p-6 hover:scale-[1.02] hover:shadow-xl transition" href="#">
+          <h3 class="font-semibold">5 First-Message Ideas That Actually Work</h3>
+          <p class="text-sm text-white/70 mt-2">Keep it playful, specific, and ask a question…</p>
+          <span class="text-xs text-white/50 mt-3 inline-block">Read more →</span>
+        </a>
+      <% }) %>
+    </div>
+  </main>
+  <%- include('partials/footer') %>
+</body>
+</html>

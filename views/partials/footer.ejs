@@ -1,21 +1,82 @@
-<footer class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] shadow-md px-3 md:px-4 text-black">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid gap-6 sm:grid-cols-3">
-    <div>
-      <div class="font-semibold text-base">AfroVibe</div>
-      <p class="text-sm/6 opacity-90 mt-1">Find genuine connections with intent.</p>
+<footer class="bg-black/80 backdrop-blur-xl border-t border-white/10 py-10 mt-auto">
+  <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm">
+
+      <!-- Brand & Tagline -->
+      <div class="md:col-span-1">
+        <h2 class="text-3xl font-extrabold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+          AfroVibe
+        </h2>
+        <p class="text-white/80 mt-2 text-sm leading-relaxed">
+          Find genuine connections with intent.
+        </p>
+        <p class="text-white/50 text-xs mt-4">
+          © <%= new Date().getFullYear() %> AfroVibe Dating. All rights reserved.
+        </p>
+      </div>
+
+      <!-- Discover -->
+      <div>
+        <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] rounded-full"></span>
+          Discover
+        </h3>
+        <ul class="space-y-2 text-white/70">
+          <li><a href="/how-it-works" class="hover:text-[#FF6B6B] transition">How It Works</a></li>
+          <li><a href="/success-stories" class="hover:text-[#FF6B6B] transition">Success Stories</a></li>
+          <li><a href="/blog" class="hover:text-[#FF6B6B] transition">Blog</a></li>
+          <li><a href="/events" class="hover:text-[#FF6B6B] transition">AfroVibe Events</a></li>
+        </ul>
+      </div>
+
+      <!-- Support & Safety -->
+      <div>
+        <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] rounded-full"></span>
+          Support & Safety
+        </h3>
+        <ul class="space-y-2 text-white/70">
+          <li><a href="/help" class="hover:text-[#FF6B6B] transition">Help Center</a></li>
+          <li><a href="/safety" class="hover:text-[#FF6B6B] transition">Safety Tips</a></li>
+          <li><a href="/report" class="hover:text-[#FF6B6B] transition">Report a Concern</a></li>
+          <li><a href="/community-guidelines" class="hover:text-[#FF6B6B] transition">Community Guidelines</a></li>
+        </ul>
+      </div>
+
+      <!-- Legal -->
+      <div>
+        <h3 class="font-bold text-white mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] rounded-full"></span>
+          Legal
+        </h3>
+        <ul class="space-y-2 text-white/70">
+          <li><a href="/terms" class="hover:text-[#FF6B6B] transition">Terms of Service</a></li>
+          <li><a href="/privacy" class="hover:text-[#FF6B6B] transition">Privacy Policy</a></li>
+          <li><a href="/cookies" class="hover:text-[#FF6B6B] transition">Cookie Policy</a></li>
+          <li><a href="/contact" class="hover:text-[#FF6B6B] transition">Contact Us</a></li>
+        </ul>
+      </div>
+
     </div>
 
-    <nav aria-label="Footer links" class="text-sm space-y-1">
-      <a class="hover:underline block" href="/about">About</a>
-      <a class="hover:underline block" href="/contact">Contact</a>
-      <a class="hover:underline block" href="/safety">Safety</a>
-      <a class="hover:underline block" href="/terms">Terms</a>
-      <a class="hover:underline block" href="/privacy">Privacy</a>
-    </nav>
+    <!-- Bottom Bar: Social + Made in Africa -->
+    <div class="mt-10 pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between items-center text-xs text-white/50">
+      <p class="flex items-center gap-1">
+        Made with <span class="text-red-500 animate-pulse">❤️</span> in Africa
+      </p>
+      <div class="flex gap-5 mt-3 md:mt-0">
+        <a href="#" class="hover:text-[#FF6B6B] transition">Instagram</a>
+        <a href="#" class="hover:text-[#FF6B6B] transition">Twitter</a>
+        <a href="#" class="hover:text-[#FF6B6B] transition">TikTok</a>
+      </div>
+    </div>
 
-    <div class="text-sm opacity-90">
-      <div>© <%= new Date().getFullYear() %> AfroVibe Dating</div>
-      <div class="mt-1">All rights reserved.</div>
+    <!-- Trust Badges -->
+    <div class="mt-6 flex justify-center gap-6 opacity-60">
+      <img src="/images/shield.svg" alt="Safety Verified" class="h-7">
+      <img src="/images/ssl.svg" alt="SSL Secured" class="h-7">
+      <img src="/images/app-store.svg" alt="App Store" class="h-7">
+      <img src="/images/play-store.svg" alt="Google Play" class="h-7">
     </div>
   </div>
 </footer>

@@ -140,43 +140,74 @@
   });
 
   // ---------- FAVORITES ⭐ ----------
-  delegate('.favorite-toggle', 'click', async (btn) => {
-    const id = btn.getAttribute('data-id') || btn.dataset.userId;
-    if (!id) return;
+delegate('.favorite-toggle', 'click', async (btn) => {
+  const id = btn.getAttribute('data-id') || btn.dataset.userId;
+  if (!id) return;
 
-    const isOn = btn.classList.contains('text-yellow-500') || btn.getAttribute('aria-pressed') === 'true';
-    btn.disabled = true;
+  const isOn = btn.classList.contains('text-yellow-500') || btn.getAttribute('aria-pressed') === 'true';
+  btn.disabled = true;
 
-    // Try API route, fall back to legacy
-    let res = await fetch(`/api/favorites/${encodeURIComponent(id)}`, {
+  // Try API route, fall back to legacy
+  let res = await fetch(`/api/favorites/${encodeURIComponent(id)}`, {
+    method: isOn ? 'DELETE' : 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) {
+    res = await fetch(`/favorite/${encodeURIComponent(id)}`, {
       method: isOn ? 'DELETE' : 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' }
     });
-    if (!res.ok) {
-      res = await fetch(`/favorite/${encodeURIComponent(id)}`, {
-        method: isOn ? 'DELETE' : 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' }
-      });
+  }
+
+  let data = {};
+  try { data = await res.json(); } catch {}
+
+  if (res.ok && data && data.ok !== false) {
+    const next = !isOn;
+
+    // Keep your legacy yellow toggle (if you still want it)
+    btn.classList.toggle('text-yellow-500', next);
+
+    // ARIA/title
+    btn.setAttribute('aria-pressed', String(next));
+    btn.title = next ? 'Unfavorite' : 'Favorite';
+
+    // Find the visible star icon (prefer .fav-icon; fallback to non-sr-only span)
+    const icon =
+      btn.querySelector('.fav-icon') ||
+      btn.querySelector('span:not(.sr-only)');
+
+    if (icon) {
+      // Make it larger and ensure smooth transform
+      icon.classList.add('text-2xl', 'transition-transform', 'duration-150');
+
+      // Gradient ON state; text color OFF state
+      icon.classList.toggle('text-transparent',  next);
+      icon.classList.toggle('bg-clip-text',      next);
+      icon.classList.toggle('bg-gradient-to-r',  next);
+      icon.classList.toggle('from-[#FF6B6B]',    next);
+      icon.classList.toggle('to-[#FECA57]',      next);
+
+      icon.classList.toggle('text-white/90',     !next); // OFF text color
+
+      // Micro “pop” when turning ON
+      if (next) {
+        icon.classList.add('scale-110');
+        setTimeout(() => icon.classList.remove('scale-110'), 150);
+      }
+
+      // Keep icon glyph
+      icon.textContent = '★';
     }
+  } else {
+    openModal('Error', (data && (data.error || data.message)) || 'Could not update favorites.');
+  }
 
-    let data = {};
-    try { data = await res.json(); } catch {}
+  btn.disabled = false;
+});
 
-    if (res.ok && data && data.ok !== false) {
-      const next = !isOn;
-      btn.classList.toggle('text-yellow-500', next);
-      btn.setAttribute('aria-pressed', String(next));
-      btn.title = next ? 'Unfavorite' : 'Favorite';
-      const label = btn.querySelector('span:not(.sr-only)');
-      if (label) label.textContent = next ? '★' : '★'; // keep icon only
-    } else {
-      openModal('Error', (data && (data.error || data.message)) || 'Could not update favorites.');
-    }
-
-    btn.disabled = false;
-  });
 
   // ---------- SUPER-LIKE ⚡ ----------
   delegate('.superlike-btn', 'click', async (btn) => {

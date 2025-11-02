@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="afrovibe">
+  <%- include('partials/head', { pageTitle: pageTitle || 'AfroVibe Events' }) %>
+<body class="bg-black text-white min-h-screen flex flex-col">
+  <%- include('partials/navbar') %>
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+    <h1 class="text-3xl font-bold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">AfroVibe Events</h1>
+    <div class="space-y-4">
+      <% ;['Speed Dating (Nairobi)','Brunch & Games (Lagos)','Sunset Mixer (Cape Town)'].forEach((title)=>{ %>
+        <div class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 p-6 flex items-center justify-between">
+          <div>
+            <div class="font-semibold"><%= title %></div>
+            <div class="text-sm text-white/60">Limited spots · RSVP</div>
+          </div>
+          <button class="btn rounded-full text-black bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">RSVP</button>
+        </div>
+      <% }) %>
+    </div>
+  </main>
+  <%- include('partials/footer') %>
+</body>
+</html>

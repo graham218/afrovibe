@@ -2,32 +2,80 @@
 <html lang="en" data-theme="afrovibe">
   <head>
     <%- include('partials/head.ejs', { pageTitle: 'Advanced Search' }) %>
+    <style>
+      /* Force dark native controls across browsers */
+      :root { color-scheme: dark; }
+      /* Inputs / selects / textareas on black glass */
+      input.input, select.select, textarea.textarea {
+        background-color: rgba(15,15,15,0.85) !important;
+        color: #fff !important;
+        border-color: rgba(255,255,255,0.16) !important;
+      }
+      input.input::placeholder,
+      textarea.textarea::placeholder {
+        color: rgba(255,255,255,0.60) !important;
+      }
+      /* Native select list items in dark mode (Chrome/Firefox) */
+      select.select option {
+        background: #0b0b0b;
+        color: #fff;
+      }
+      /* Improve focus visibility */
+      input.input:focus, select.select:focus, textarea.textarea:focus {
+        outline: none !important;
+        box-shadow: 0 0 0 2px rgba(254,202,87,0.35) !important;
+        border-color: rgba(254,202,87,0.55) !important;
+      }
+      /* Tiny label boost */
+      .label-text { color: rgba(255,255,255,0.90) !important; }
+    </style>
   </head>
-  <body class="bg-base-100 min-h-screen">
-    <!-- Navbar (use res.locals; do not override with explicit locals) -->
+
+  <!-- Deep black canvas with subtle gradient depth -->
+  <body class="bg-black text-white min-h-screen relative">
+    <!-- page-only ambient glow (keeps navbar/footer readable) -->
+    <div aria-hidden="true"
+         class="pointer-events-none absolute inset-0 -z-10
+                bg-[radial-gradient(60%_45%_at_20%_0%,rgba(255,107,107,.12),transparent_60%),radial-gradient(55%_40%_at_90%_100%,rgba(254,202,87,.10),transparent_60%)]">
+    </div>
+
+    <!-- Navbar (unchanged so it stays readable across pages) -->
     <%- include('partials/navbar.ejs') %>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold">Advanced Search</h1>
+    <main class="relative isolation-isolate max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
+      <!-- Page header -->
+      <div class="flex items-center justify-between mb-6 md:mb-8">
+        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">
+          <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Advanced Search</span>
+        </h1>
         <div class="flex items-center gap-2">
-          <a href="/advanced-search" class="link link-primary text-sm">Set to default</a>
-          <a href="/dashboard" class="btn btn-ghost btn-sm">← Back to Discover</a>
+          <a href="/advanced-search"
+             class="btn btn-ghost btn-sm rounded-full text-white/85 hover:bg-white/10">Reset</a>
+          <a href="/dashboard"
+             class="btn btn-ghost btn-sm rounded-full text-white/85 hover:bg-white/10">← Discover</a>
         </div>
       </div>
 
+      <!-- Layout -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <!-- Filters -->
-        <aside class="lg:col-span-4">
-          <form method="get" action="/advanced-search" class="card bg-base-100 border shadow-sm">
-            <div class="card-body p-4 sm:p-6">
-              <h2 class="card-title text-base mb-2">Search for Your Matches</h2>
+        <!-- Filters (glass form) -->
+        <aside class="lg:col-span-12">
+          <!-- Submit to dashboard with GET so the Discover feed uses these filters -->
+          <form method="get" action="/dashboard"
+                class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+            <div class="p-4 sm:p-6 md:p-8">
+              <h2 class="text-lg md:text-xl font-semibold mb-4">
+                <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+                  Search for Your Matches
+                </span>
+              </h2>
 
               <!-- Row 1: Gender + Age -->
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <label class="form-control">
                   <span class="label-text">I’m looking for</span>
-                  <select name="seekingGender" class="select select-bordered">
+                  <select name="seekingGender"
+                          class="select select-bordered text-white [color-scheme:dark]">
                     <option value="Any"        <%= filters.seekingGender==='Any' ? 'selected' : '' %>>Any</option>
                     <option value="Male"       <%= filters.seekingGender==='Male' ? 'selected' : '' %>>Male</option>
                     <option value="Female"     <%= filters.seekingGender==='Female' ? 'selected' : '' %>>Female</option>
@@ -37,7 +85,7 @@
 
                 <label class="form-control">
                   <span class="label-text">Age (min)</span>
-                  <select name="minAge" class="select select-bordered">
+                  <select name="minAge" class="select select-bordered text-white [color-scheme:dark]">
                     <option value=""></option>
                     <% for (let a=18; a<=80; a++) { %>
                       <option value="<%= a %>" <%= String(filters.minAge||'')===String(a) ? 'selected' : '' %>><%= a %></option>
@@ -47,7 +95,7 @@
 
                 <label class="form-control">
                   <span class="label-text">Age (max)</span>
-                  <select name="maxAge" class="select select-bordered">
+                  <select name="maxAge" class="select select-bordered text-white [color-scheme:dark]">
                     <option value=""></option>
                     <% for (let a=18; a<=80; a++) { %>
                       <option value="<%= a %>" <%= String(filters.maxAge||'')===String(a) ? 'selected' : '' %>><%= a %></option>
@@ -57,26 +105,29 @@
               </div>
 
               <!-- Row 2: Location -->
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
                 <label class="form-control">
                   <span class="label-text">Country</span>
-                  <input name="country" class="input input-bordered" placeholder="Any"
-                         value="<%= filters.country || '' %>">
+                  <input name="country"
+                         class="input input-bordered"
+                         placeholder="Any" value="<%= filters.country || '' %>">
                 </label>
                 <label class="form-control">
                   <span class="label-text">State / Province</span>
-                  <input name="stateProvince" class="input input-bordered"
+                  <input name="stateProvince"
+                         class="input input-bordered"
                          value="<%= filters.stateProvince || '' %>">
                 </label>
                 <label class="form-control">
                   <span class="label-text">City</span>
-                  <input name="city" class="input input-bordered"
+                  <input name="city"
+                         class="input input-bordered"
                          value="<%= filters.city || '' %>">
                 </label>
               </div>
 
               <!-- Row 3: Distance + Sort (with premium locks) -->
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
                 <label class="form-control">
                   <span class="label-text flex items-center gap-2">
                     Radius (km)
@@ -85,7 +136,8 @@
                     <% } %>
                   </span>
                   <input
-                    name="radiusKm" type="number" min="0" class="input input-bordered"
+                    name="radiusKm" type="number" min="0"
+                    class="input input-bordered"
                     value="<%= filters.radiusKm || '' %>"
                     <% if (premiumLocks && premiumLocks.radius && planOf(currentUser)==='free') { %>
                       data-locked="Radius"
@@ -100,7 +152,9 @@
                       <span class="badge badge-warning badge-outline">🔒 distance</span>
                     <% } %>
                   </span>
-                  <select name="sort" class="select select-bordered" <%= (premiumLocks && premiumLocks.distanceSort && planOf(currentUser)==='free') ? 'data-lock-distance' : '' %>>
+                  <select name="sort"
+                          class="select select-bordered text-white [color-scheme:dark]"
+                          <%= (premiumLocks && premiumLocks.distanceSort && planOf(currentUser)==='free') ? 'data-lock-distance' : '' %>>
                     <option value="active"   <%= filters.sort==='active' ? 'selected' : '' %>>Recently active</option>
                     <option value="recent"   <%= filters.sort==='recent' ? 'selected' : '' %>>Newest members</option>
                     <option value="ageAsc"   <%= filters.sort==='ageAsc' ? 'selected' : '' %>>Age ↑</option>
@@ -114,28 +168,28 @@
               </div>
 
               <!-- Quick toggles -->
-              <div class="mt-4 space-y-2">
+              <div class="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" class="checkbox checkbox-sm"
+                  <input type="checkbox" class="checkbox checkbox-primary checkbox-sm"
                          name="verifiedOnly" value="1" <%= filters.verifiedOnly==='1' ? 'checked' : '' %> />
-                  <span>Verified only</span>
+                  <span class="text-white/90">Verified only</span>
                 </label>
 
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" class="checkbox checkbox-sm"
+                  <input type="checkbox" class="checkbox checkbox-primary checkbox-sm"
                          name="onlineNow" value="1" <%= filters.onlineNow==='1' ? 'checked' : '' %> />
-                  <span>Online now</span>
+                  <span class="text-white/90">Online now</span>
                 </label>
 
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" class="checkbox checkbox-sm"
+                  <input type="checkbox" class="checkbox checkbox-primary checkbox-sm"
                          name="hasPhoto" value="1" <%= filters.hasPhoto==='1' ? 'checked' : '' %> />
-                  <span>Has photo</span>
+                  <span class="text-white/90">Has photo</span>
                 </label>
               </div>
 
-              <!-- Minimum photos (align UX with dashboard select) -->
-              <div class="mt-3">
+              <!-- Minimum photos -->
+              <div class="mt-4">
                 <label class="form-control">
                   <span class="label-text flex items-center gap-2">
                     Minimum photos
@@ -143,8 +197,9 @@
                       <span class="badge badge-warning badge-outline">🔒</span>
                     <% } %>
                   </span>
-                  <select name="minPhotos" class="select select-bordered"
-                    <%= (premiumLocks && premiumLocks.minPhotos && planOf(currentUser)==='free') ? 'data-locked="Min photos"' : '' %>>
+                  <select name="minPhotos"
+                          class="select select-bordered text-white [color-scheme:dark]"
+                          <%= (premiumLocks && premiumLocks.minPhotos && planOf(currentUser)==='free') ? 'data-locked="Min photos"' : '' %>>
                     <option value="">Any</option>
                     <option value="2" <%= filters.minPhotos==='2'?'selected':'' %>>2+</option>
                     <option value="3" <%= filters.minPhotos==='3'?'selected':'' %>>3+</option>
@@ -154,30 +209,32 @@
               </div>
 
               <!-- Search text + interests -->
-              <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label class="form-control">
                   <span class="label-text">Keyword</span>
-                  <input name="q" class="input input-bordered" placeholder="bio, username…"
-                         value="<%= filters.q || '' %>">
+                  <input name="q" class="input input-bordered"
+                         placeholder="bio, username…" value="<%= filters.q || '' %>">
                 </label>
                 <label class="form-control">
                   <span class="label-text">Interests</span>
-                  <input name="interests" class="input input-bordered" placeholder="music, sports…"
-                         value="<%= filters.interests || '' %>">
+                  <input name="interests" class="input input-bordered"
+                         placeholder="music, sports…" value="<%= filters.interests || '' %>">
                 </label>
               </div>
 
               <!-- Cultural -->
-              <div class="mt-6">
-                <h3 class="font-semibold mb-2">Cultural</h3>
+              <div class="mt-8">
+                <h3 class="font-semibold mb-2 text-white/90">Cultural</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <label class="form-control">
                     <span class="label-text">Religion</span>
-                    <input name="religion" class="input input-bordered" value="<%= filters.religion || '' %>">
+                    <input name="religion" class="input input-bordered"
+                           value="<%= filters.religion || '' %>">
                   </label>
                   <label class="form-control">
                     <span class="label-text">Denomination</span>
-                    <input name="denomination" class="input input-bordered" value="<%= filters.denomination || '' %>">
+                    <input name="denomination" class="input input-bordered"
+                           value="<%= filters.denomination || '' %>">
                   </label>
                   <label class="form-control sm:col-span-3">
                     <span class="label-text flex items-center gap-2">
@@ -186,7 +243,8 @@
                         <span class="badge badge-warning badge-outline">🔒</span>
                       <% } %>
                     </span>
-                    <input name="languages" class="input input-bordered"
+                    <input name="languages"
+                           class="input input-bordered"
                            placeholder="English, Swahili"
                            value="<%= Array.isArray(filters.languages)?filters.languages.join(', '):(filters.languages||'') %>"
                            <%= (premiumLocks && premiumLocks.languages && planOf(currentUser)==='free') ? 'data-locked="Languages"' : '' %>>
@@ -195,8 +253,8 @@
               </div>
 
               <!-- Lifestyle -->
-              <div class="mt-6">
-                <h3 class="font-semibold mb-2">Lifestyle</h3>
+              <div class="mt-8">
+                <h3 class="font-semibold mb-2 text-white/90">Lifestyle</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <label class="form-control">
                     <span class="label-text">Education</span>
@@ -215,34 +273,38 @@
                   </label>
                 </div>
                 <% if (premiumLocks && premiumLocks.lifestyle && planOf(currentUser)==='free') { %>
-                  <div class="mt-2 text-xs opacity-70">Some lifestyle filters are Premium. We’ll adjust if needed.</div>
+                  <div class="mt-2 text-xs text-white/70">Some lifestyle filters are Premium. We’ll adjust if needed.</div>
                 <% } %>
               </div>
 
               <!-- Activity & Freshness -->
-              <div class="mt-6">
-                <h3 class="font-semibold mb-2">Activity & Freshness</h3>
+              <div class="mt-8">
+                <h3 class="font-semibold mb-2 text-white/90">Activity & Freshness</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <label class="form-control">
                     <span class="label-text">Joined within (days)</span>
-                    <input name="joinedWithinDays" type="number" min="0" class="input input-bordered"
+                    <input name="joinedWithinDays" type="number" min="0"
+                           class="input input-bordered"
                            value="<%= filters.joinedWithinDays || '' %>">
                   </label>
                   <label class="form-control">
                     <span class="label-text">Active within (min)</span>
-                    <input name="activeWithinMin" type="number" min="0" class="input input-bordered"
+                    <input name="activeWithinMin" type="number" min="0"
+                           class="input input-bordered"
                            value="<%= filters.activeWithinMin || '' %>">
                   </label>
                   <label class="form-control">
                     <span class="label-text">Bio length ≥</span>
-                    <input name="bioMinLen" type="number" min="0" class="input input-bordered"
+                    <input name="bioMinLen" type="number" min="0"
+                           class="input input-bordered"
                            value="<%= filters.bioMinLen || '' %>">
                   </label>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                   <label class="form-control">
                     <span class="label-text">Prompts answered ≥</span>
-                    <input name="promptsMin" type="number" min="0" class="input input-bordered"
+                    <input name="promptsMin" type="number" min="0"
+                           class="input input-bordered"
                            value="<%= filters.promptsMin || '' %>">
                   </label>
                   <label class="form-control sm:col-span-2">
@@ -250,8 +312,9 @@
                       Available for Video Chat
                       <% if (premiumLocks?.videoChat && planOf(currentUser)==='free') { %><span class="badge badge-outline">🔒 Elite</span><% } %>
                     </span>
-                    <select name="videoChat" class="select select-bordered"
-                      <%= premiumLocks?.videoChat && planOf(currentUser)==='free' ? 'data-locked="Video chat"' : '' %>>
+                    <select name="videoChat"
+                            class="select select-bordered text-white [color-scheme:dark]"
+                            <%= premiumLocks?.videoChat && planOf(currentUser)==='free' ? 'data-locked="Video chat"' : '' %>>
                       <option value="">Any</option>
                       <option value="1" <%= filters.videoChat==='1' ? 'selected' : '' %>>Yes</option>
                       <option value="0" <%= filters.videoChat==='0' ? 'selected' : '' %>>No</option>
@@ -261,114 +324,72 @@
               </div>
 
               <!-- Social graph shortcuts -->
-              <div class="mt-6">
-                <h3 class="font-semibold mb-2">Connections</h3>
+              <div class="mt-8">
+                <h3 class="font-semibold mb-2 text-white/90">Connections</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" class="checkbox checkbox-sm"
+                    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm"
                            name="likedMe" value="1" <%= filters.likedMe==='1' ? 'checked' : '' %> />
-                    <span>People who liked me</span>
+                    <span class="text-white/90">People who liked me</span>
                   </label>
                   <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" class="checkbox checkbox-sm"
+                    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm"
                            name="iFavorited" value="1" <%= filters.iFavorited==='1' ? 'checked' : '' %> />
-                    <span>I favorited</span>
+                    <span class="text-white/90">I favorited</span>
                   </label>
                   <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" class="checkbox checkbox-sm"
+                    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm"
                            name="mutualOnly" value="1" <%= filters.mutualOnly==='1' ? 'checked' : '' %> />
-                    <span>Mutual likes only</span>
+                    <span class="text-white/90">Mutual likes only</span>
                   </label>
                   <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" class="checkbox checkbox-sm"
+                    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm"
                            name="unseenOnly" value="1" <%= filters.unseenOnly==='1' ? 'checked' : '' %> />
-                    <span>Unseen by me</span>
+                    <span class="text-white/90">Unseen by me</span>
                   </label>
                 </div>
               </div>
 
               <!-- Zodiac -->
-              <div class="mt-6">
-                <h3 class="font-semibold mb-2 flex items-center justify-between">
+              <div class="mt-8">
+                <h3 class="font-semibold mb-2 text-white/90 flex items-center justify-between">
                   <span>Zodiac Signs</span>
-                  <a href="#" class="link text-sm" data-action="zodiac-select-all">Select all</a>
+                  <a href="#" class="link text-sm text-white/85 hover:text-white" data-action="zodiac-select-all">Select all</a>
                 </h3>
                 <div class="grid grid-cols-2 gap-x-4 gap-y-2">
                   <% const z = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces']; %>
                   <% for (const sign of z) { %>
                     <label class="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" class="checkbox checkbox-sm"
+                      <input type="checkbox" class="checkbox checkbox-primary checkbox-sm"
                              name="zodiac[]" value="<%= sign %>"
                              <%= Array.isArray(filters.zodiac) && filters.zodiac.includes(sign) ? 'checked' : '' %> />
-                      <span><%= sign %></span>
+                      <span class="text-white/90"><%= sign %></span>
                     </label>
                   <% } %>
                 </div>
 
                 <label class="flex items-center gap-2 cursor-pointer mt-3">
-                  <input type="checkbox" class="checkbox checkbox-sm"
+                  <input type="checkbox" class="checkbox checkbox-primary checkbox-sm"
                          name="compatibleZodiac" value="1" <%= filters.compatibleZodiac==='1' ? 'checked' : '' %> />
-                  <span>Show only the Zodiac signs that are compatible with me</span>
+                  <span class="text-white/90">Show only the Zodiac signs that are compatible with me</span>
                 </label>
               </div>
 
               <!-- Submit -->
-              <div class="mt-6 flex items-center gap-2">
-                <button class="btn btn-primary">SHOW MATCHES</button>
-                <a href="/advanced-search" class="btn btn-ghost">Clear</a>
+              <div class="mt-8 flex items-center gap-2">
+                <button
+                  class="btn rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]
+                         hover:shadow-xl hover:scale-[1.02] transition"
+                  type="submit">
+                  <span class="mr-1">❤️</span> Apply & Discover
+                </button>
+                <a href="/advanced-search" class="btn btn-ghost rounded-full text-white/85 hover:bg-white/10">Clear</a>
               </div>
             </div>
           </form>
         </aside>
 
-        <!-- Results -->
-        <section class="lg:col-span-8">
-          <div class="flex items-center justify-between mb-3">
-            <div class="text-sm opacity-70">
-              <%= pageMeta.total %> result<%= pageMeta.total===1 ? '' : 's' %>
-            </div>
-            <div class="text-sm opacity-70">Page <%= pageMeta.page %> / <%= pageMeta.totalPages %></div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            <% (people || []).forEach(u => { %>
-              <div class="card bg-base-100 border">
-                <figure class="aspect-[4/3] bg-base-200 overflow-hidden">
-                  <% const photo = (u.profile?.photos && u.profile.photos[0]) ? u.profile.photos[0] : '/images/default-avatar.png'; %>
-                  <img src="<%= photo %>" alt="<%= u.username %>" class="w-full h-full object-cover">
-                </figure>
-                <div class="card-body p-4">
-                  <div class="flex items-center gap-2">
-                    <h3 class="font-semibold truncate"><%= u.username %></h3>
-                    <% if (u.verifiedAt) { %><span class="badge badge-success badge-outline">Verified</span><% } %>
-                    <% if (u.isOnline)   { %><span class="badge badge-info badge-outline">Online</span><% } %>
-                    <% if (u.boostActive){ %><span class="badge badge-warning badge-outline">Boost</span><% } %>
-                  </div>
-                  <div class="text-sm opacity-80">
-                    <%= u.profile?.age ? u.profile.age + ' · ' : '' %>
-                    <%= [u.profile?.city, u.profile?.country].filter(Boolean).join(', ') %>
-                  </div>
-                  <% if (typeof u.distanceKm === 'number') { %>
-                    <div class="text-xs opacity-70">~ <%= Math.round(u.distanceKm) %> km away</div>
-                  <% } %>
-                  <div class="card-actions mt-3">
-                    <a href="/users/<%= u._id %>" class="btn btn-ghost btn-sm">View</a>
-                  </div>
-                </div>
-              </div>
-            <% }) %>
-          </div>
-
-          <!-- Pager -->
-          <div class="mt-6 flex items-center justify-between">
-            <% const prevPage = Math.max(pageMeta.page - 1, 1); %>
-            <% const nextPage = Math.min(pageMeta.page + 1, pageMeta.totalPages); %>
-            <a class="btn btn-ghost btn-sm <%= pageMeta.page<=1 ? 'btn-disabled' : '' %>"
-               href="/advanced-search?<%= Object.entries(filters).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v??'')}`).join('&') %>&page=<%= prevPage %>&limit=<%= pageMeta.limit %>">← Prev</a>
-            <a class="btn btn-ghost btn-sm <%= pageMeta.page>=pageMeta.totalPages ? 'btn-disabled' : '' %>"
-               href="/advanced-search?<%= Object.entries(filters).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v??'')}`).join('&') %>&page=<%= nextPage %>&limit=<%= pageMeta.limit %>">Next →</a>
-          </div>
-        </section>
+        <!-- Per your spec, results section removed. Submitting goes to /dashboard with query params. -->
       </div>
     </main>
 

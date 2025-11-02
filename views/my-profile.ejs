@@ -2,7 +2,7 @@
 <html lang="en" data-theme="afrovibe">
   <%- include('partials/head.ejs', { pageTitle: 'My Profile' }) %>
   <body
-    class="bg-base-100 min-h-screen flex flex-col"
+    class="bg-black text-white min-h-screen flex flex-col selection:bg-[#FECA57]/30 selection:text-white"
     data-me="<%= currentUser._id %>"
     data-has-bio="<%= currentUser?.profile?.bio ? '1' : '0' %>"
     data-has-age="<%= currentUser?.profile?.age ? '1' : '0' %>"
@@ -12,34 +12,41 @@
   >
     <%- include('partials/navbar.ejs') %>
 
-    <main class="container mx-auto px-4 sm:px-5 md:px-8 py-5 flex-grow">
+    <main class="container mx-auto px-4 sm:px-5 md:px-8 py-6 md:py-8 flex-grow relative isolation-isolate">
+      <!-- Ambient overlay just for depth -->
+      <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 opacity-60 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.10),transparent_60%),radial-gradient(60%_40%_at_80%_100%,rgba(254,202,87,.10),transparent_60%)]"></div>
+
       <!-- Masthead -->
-      <section class="bg-base-200 rounded-2xl shadow-xl p-5 sm:p-6 md:p-8">
+      <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_20px_60px_-20px_rgba(0,0,0,.7)] p-5 sm:p-6 md:p-8">
         <div class="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
           <!-- Avatar -->
-          <div class="relative shrink-0">
+          <div class="relative shrink-0 group">
             <div class="avatar">
-              <div class="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2 shadow">
+              <div class="w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full ring ring-offset-2 ring-[#FECA57] ring-offset-black shadow-xl transition-transform duration-300 group-hover:scale-105">
                 <img
                   src="<%= currentUser?.profile?.photos?.[0] || '/images/default-avatar.png' %>"
                   data-fallback="/images/default-avatar.png"
-                  alt="<%= currentUser.username %> avatar" />
-
+                  alt="<%= currentUser.username %> avatar"
+                  class="object-cover"/>
               </div>
             </div>
 
             <% if (currentUser?.verifiedAt) { %>
-              <div class="badge badge-success absolute -bottom-2 left-1/2 -translate-x-1/2">Verified</div>
+              <div class="badge absolute -bottom-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black border-0 shadow">
+                ✓ Verified
+              </div>
             <% } %>
           </div>
 
           <!-- Name + meta + actions -->
           <div class="flex-1 min-w-0 text-center md:text-left">
             <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
-              <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold truncate"><%= currentUser.username %></h1>
+              <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold truncate bg-clip-text text-transparent bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]">
+                <%= currentUser.username %>
+              </h1>
 
               <% if (currentUser?.profile?.age) { %>
-                <span class="badge badge-lg"><%= currentUser.profile.age %></span>
+                <span class="badge badge-lg bg-white/10 border border-white/20 text-white/90"><%= currentUser.profile.age %></span>
               <% } %>
 
               <% /* SINGLE plan pill only */ %>
@@ -47,87 +54,89 @@
                         : ((currentUser?.plan && currentUser.plan !== 'free') ? currentUser.plan
                            : (currentUser?.isPremium ? 'premium' : 'free')); %>
               <% if (_plan !== 'free') { %>
-                <span class="badge badge-secondary badge-lg capitalize"><%= _plan %></span>
+                <span class="badge badge-lg capitalize bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black border-0 shadow"> <%= _plan %> </span>
               <% } %>
 
               <!-- Boost status (shown when active) -->
               <span id="boostBadge"
-                    class="badge badge-primary badge-lg hidden"
+                    class="badge badge-lg hidden bg-emerald-500/15 text-emerald-300 border border-emerald-400/30"
                     data-expires="<%= currentUser?.boostExpiresAt ? new Date(currentUser.boostExpiresAt).toISOString() : '' %>">
                 Boost active • <span id="boostCountdown">00:00</span>
               </span>
             </div>
 
-            <div class="mt-2 text-gray-500 flex flex-wrap items-center gap-2 justify-center md:justify-start">
+            <div class="mt-2 text-white/70 flex flex-wrap items-center gap-2 justify-center md:justify-start">
               <% const locParts = [currentUser?.profile?.city, currentUser?.profile?.country].filter(Boolean); %>
-              <span class="badge badge-outline"><%= locParts.length ? locParts.join(', ') : 'Location not set' %></span>
+              <span class="badge bg-white/5 border border-white/10 text-white/80">
+                <%= locParts.length ? locParts.join(', ') : 'Location not set' %>
+              </span>
 
               <% if (currentUser?.profile?.occupation) { %>
-                <span class="badge badge-outline"><%= currentUser.profile.occupation %></span>
+                <span class="badge bg-white/5 border border-white/10 text-white/80"> <%= currentUser.profile.occupation %> </span>
               <% } %>
 
               <% if (Array.isArray(currentUser?.profile?.interests) && currentUser.profile.interests.length) { %>
-                <span class="badge badge-outline">Interests: <%= currentUser.profile.interests.join(', ') %></span>
+                <span class="badge bg-white/5 border border-white/10 text-white/80">Interests: <%= currentUser.profile.interests.join(', ') %></span>
               <% } %>
             </div>
 
             <div class="mt-4 flex flex-wrap gap-2 justify-center md:justify-start">
-              <a href="/settings" class="btn btn-ghost btn-sm">Settings</a>
-              <button id="setLocationBtn" class="btn btn-outline btn-sm">Use my location</button>
-              <button id="boostBtn" class="btn btn-primary btn-sm">Boost profile</button>
-              <button id="copyLinkBtn" class="btn btn-ghost btn-sm">Copy profile link</button>
+              <a href="/settings" class="btn btn-sm rounded-full bg-white/10 border border-white/20 text-black hover:bg-white/15">Settings</a>
+              <button id="setLocationBtn" class="btn btn-sm rounded-full bg-white/10 border border-white/20 text-black hover:bg-white/15">Use my location</button>
+              <button id="boostBtn" class="btn btn-sm rounded-full bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black border-0 hover:shadow-xl hover:scale-[1.02] transition">Boost profile</button>
+              <button id="copyLinkBtn" class="btn btn-sm rounded-full bg-white/10 border border-white/20 text-black hover:bg-white/15">Copy profile link</button>
             </div>
           </div>
         </div>
 
         <!-- Quick stats + completion -->
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mt-6">
-          <div class="stats shadow w-full lg:col-span-3 grid grid-cols-3">
-            <div class="stat">
-              <div class="stat-title">Likes Sent</div>
-              <div class="stat-value text-base sm:text-2xl"><%= (currentUser?.likes?.length || 0) %></div>
+          <div class="grid grid-cols-3 rounded-2xl overflow-hidden border border-white/10 bg-black/40 backdrop-blur-xl">
+            <div class="p-4">
+              <div class="text-white/60 text-xs">Likes Sent</div>
+              <div class="text-xl sm:text-2xl font-semibold"><%= (currentUser?.likes?.length || 0) %></div>
             </div>
-            <div class="stat">
-              <div class="stat-title">Liked By</div>
-              <div class="stat-value text-base sm:text-2xl"><%= (currentUser?.likedBy?.length || 0) %></div>
+            <div class="p-4 border-l border-white/10">
+              <div class="text-white/60 text-xs">Liked By</div>
+              <div class="text-xl sm:text-2xl font-semibold"><%= (currentUser?.likedBy?.length || 0) %></div>
             </div>
-            <div class="stat">
-              <div class="stat-title">Matches</div>
-              <div class="stat-value text-base sm:text-2xl"><%= (currentUser?.matches?.length || 0) %></div>
+            <div class="p-4 border-l border-white/10">
+              <div class="text-white/60 text-xs">Matches</div>
+              <div class="text-xl sm:text-2xl font-semibold"><%= (currentUser?.matches?.length || 0) %></div>
             </div>
           </div>
 
-          <div class="card bg-base-100 shadow">
+          <div class="card bg-black/40 backdrop-blur-xl border border-white/10">
             <div class="card-body">
               <div class="flex items-center justify-between">
-                <h3 class="card-title text-sm">Profile completion</h3>
+                <h3 class="card-title text-sm text-white/90">Profile completion</h3>
                 <span id="completionPct" class="text-sm font-semibold">0%</span>
               </div>
-              <progress id="completionBar" class="progress progress-primary w-full" value="0" max="100"></progress>
+              <progress id="completionBar" class="progress w-full progress-primary" value="0" max="100"></progress>
             </div>
           </div>
         </div>
       </section>
 
       <!-- OVERVIEW (read-only, exhaustive) -->
-      <section class="mt-8 bg-base-200 rounded-2xl shadow-xl p-4 sm:p-5 md:p-6">
+      <section class="mt-8 rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 p-4 sm:p-5 md:p-6 shadow-[0_20px_60px_-20px_rgba(0,0,0,.7)]">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Left: About + Details + Personality + Prompts -->
           <div class="lg:col-span-2 space-y-6">
             <!-- About -->
-            <div class="card bg-base-100 shadow">
+            <div class="card bg-black/40 backdrop-blur-xl border border-white/10 hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition">
               <div class="card-body">
-                <h2 class="card-title">About me</h2>
-                <p class="mt-2 leading-relaxed">
+                <h2 class="card-title bg-clip-text text-transparent bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]">About me</h2>
+                <p class="mt-2 leading-relaxed text-white/85">
                   <%= (currentUser?.profile?.bio && currentUser.profile.bio.trim()) || 'No bio provided yet.' %>
                 </p>
               </div>
             </div>
 
             <!-- My details -->
-            <div class="card bg-base-100 shadow">
+            <div class="card bg-black/40 backdrop-blur-xl border border-white/10 hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition">
               <div class="card-body">
-                <h2 class="card-title">My details</h2>
+                <h2 class="card-title bg-clip-text text-transparent bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]">My details</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                   <% const D = currentUser?.profile || {}; %>
                   <% const langs =
@@ -161,20 +170,20 @@
 
                   <% if (details.length) { details.forEach(d => { %>
                     <div class="flex items-center gap-2">
-                      <span class="text-xs sm:text-sm text-gray-500 w-40 sm:w-44"><%= d.l %>:</span>
-                      <span class="text-sm sm:text-base font-medium"><%= d.v %></span>
+                      <span class="text-xs sm:text-sm text-white/60 w-40 sm:w-44"><%= d.l %>:</span>
+                      <span class="text-sm sm:text-base font-medium text-white/90"><%= d.v %></span>
                     </div>
                   <% }) } else { %>
-                    <p class="text-sm text-gray-500 italic">No details added yet.</p>
+                    <p class="text-sm text-white/60 italic">No details added yet.</p>
                   <% } %>
                 </div>
               </div>
             </div>
 
             <!-- Personality -->
-            <div class="card bg-base-100 shadow">
+            <div class="card bg-black/40 backdrop-blur-xl border border-white/10 hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition">
               <div class="card-body">
-                <h2 class="card-title">Personality</h2>
+                <h2 class="card-title bg-clip-text text-transparent bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]">Personality</h2>
                 <% const P = currentUser?.profile || {}; %>
                 <% const personality = [
                   { l:'Early bird / Night owl', v:P.earlyBirdNightOwl },
@@ -203,39 +212,39 @@
                   <div class="mt-2 grid sm:grid-cols-2 gap-2">
                     <% personality.forEach((row) => { %>
                       <div class="flex items-center gap-2">
-                        <span class="text-xs sm:text-sm text-gray-500 w-44"><%= row.l %>:</span>
-                        <span class="text-sm sm:text-base font-medium"><%= row.v %></span>
+                        <span class="text-xs sm:text-sm text-white/60 w-44"><%= row.l %>:</span>
+                        <span class="text-sm sm:text-base font-medium text-white/90"><%= row.v %></span>
                       </div>
                     <% }) %>
                   </div>
                 <% } else { %>
-                  <p class="text-sm text-gray-500 italic">No personality details yet.</p>
+                  <p class="text-sm text-white/60 italic">No personality details yet.</p>
                 <% } %>
               </div>
             </div>
 
             <!-- Prompts (top-level) -->
             <div class="grid md:grid-cols-3 gap-4">
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-black/40 backdrop-blur-xl border border-white/10">
                 <div class="card-body">
-                  <div class="text-xs opacity-70">Favorite African Artists</div>
-                  <div class="mt-2 text-sm leading-[1.55]">
+                  <div class="text-xs text-white/60">Favorite African Artists</div>
+                  <div class="mt-2 text-sm leading-[1.55] text-white/90">
                     <%= currentUser?.favoriteAfricanArtists || '—' %>
                   </div>
                 </div>
               </div>
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-black/40 backdrop-blur-xl border border-white/10">
                 <div class="card-body">
-                  <div class="text-xs opacity-70">Cultural Traditions</div>
-                  <div class="mt-2 text-sm leading-[1.55]">
+                  <div class="text-xs text-white/60">Cultural Traditions</div>
+                  <div class="mt-2 text-sm leading-[1.55] text-white/90">
                     <%= currentUser?.culturalTraditions || '—' %>
                   </div>
                 </div>
               </div>
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-black/40 backdrop-blur-xl border border-white/10">
                 <div class="card-body">
-                  <div class="text-xs opacity-70">Relationship Goals</div>
-                  <div class="mt-2 text-sm leading-[1.55]">
+                  <div class="text-xs text-white/60">Relationship Goals</div>
+                  <div class="mt-2 text-sm leading-[1.55] text-white/90">
                     <%= currentUser?.relationshipGoals || '—' %>
                   </div>
                 </div>
@@ -246,31 +255,31 @@
           <!-- Right: Photos + Activity -->
           <div class="space-y-6">
             <!-- Photos -->
-            <div class="card bg-base-100 shadow">
+            <div class="card bg-black/40 backdrop-blur-xl border border-white/10">
               <div class="card-body">
-                <h2 class="card-title">Photos</h2>
+                <h2 class="card-title bg-clip-text text-transparent bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]">Photos</h2>
                 <% const photos = Array.isArray(currentUser?.profile?.photos) ? currentUser.profile.photos : []; %>
                 <% if (photos.length) { %>
                   <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
                     <% photos.forEach((p) => { %>
-                      <img src="<%= p %>" alt="Photo" class="w-full aspect-[4/5] object-cover rounded-xl shadow">
+                      <img src="<%= p %>" alt="Photo" class="w-full aspect-[4/5] object-cover rounded-xl shadow transition-transform duration-300 hover:scale-105">
                     <% }); %>
                   </div>
                 <% } else { %>
-                  <p class="text-sm text-gray-500 italic mt-2">No photos uploaded yet.</p>
+                  <p class="text-sm text-white/60 italic mt-2">No photos uploaded yet.</p>
                 <% } %>
 
                 <form action="/my-profile" method="post" enctype="multipart/form-data" class="mt-3 flex items-center gap-2">
-                  <input type="file" name="photos" multiple accept="image/*" class="file-input file-input-bordered file-input-sm w-full sm:w-auto">
-                  <button class="btn btn-sm btn-primary">Upload</button>
+                  <input type="file" name="photos" multiple accept="image/*" class="file-input file-input-bordered file-input-sm w-full sm:w-auto bg-black/50 text-white border-white/20">
+                  <button class="btn btn-sm rounded-full bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black border-0 hover:shadow-xl hover:scale-[1.02] transition">Upload</button>
                 </form>
               </div>
             </div>
 
             <!-- Activity -->
-            <div class="card bg-base-100 shadow">
+            <div class="card bg-black/40 backdrop-blur-xl border border-white/10">
               <div class="card-body">
-                <h2 class="card-title">Activity</h2>
+                <h2 class="card-title bg-clip-text text-transparent bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]">Activity</h2>
                 <div class="flex items-center gap-3">
                   <div class="radial-progress text-primary"
                        id="streakRadial"
@@ -280,7 +289,7 @@
                   </div>
                   <div>
                     <div class="font-medium">Weekly streak</div>
-                    <div class="text-sm text-gray-500">Keep logging in daily to hit your 7-day streak.</div>
+                    <div class="text-sm text-white/60">Keep logging in daily to hit your 7-day streak.</div>
                   </div>
                 </div>
               </div>

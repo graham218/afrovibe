@@ -1,242 +1,319 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="afrovibe">
-<%- include('partials/head.ejs', { pageTitle: 'Upgrade' }) %>
-<body data-theme="cupcake" class="bg-base-100 min-h-screen flex flex-col">
-  <%- include('partials/navbar.ejs') %>
+  <%- include('partials/head.ejs', { pageTitle: 'Upgrade — AfroVibe' }) %>
+  <body class="min-h-screen flex flex-col bg-black text-white">
 
-  <div class="container mx-auto p-4 flex-grow">
-    <!-- Page Header -->
-    <div class="max-w-5xl mx-auto mb-6">
-      <h1 class="text-4xl font-extrabold text-primary">Upgrade Your Plan</h1>
-      <p class="text-gray-500 mt-2">Unlock more visibility, better matches, and premium features.</p>
-    </div>
+    <!-- NAV -->
+    <%- include('partials/navbar.ejs') %>
 
-    <!-- Flash Messages -->
-    <% if (typeof success !== 'undefined' && success) { %>
-      <div class="alert alert-success shadow-lg max-w-5xl mx-auto my-4">
-        <div>
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <span><%= success %></span>
-        </div>
+    <!-- page backdrop (only under main content) -->
+    <main class="flex-1 relative isolation-isolate">
+      <div aria-hidden="true"
+           class="pointer-events-none absolute inset-0 -z-10
+                  bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.10),transparent_60%),radial-gradient(60%_40%_at_85%_100%,rgba(254,202,87,.10),transparent_60%)]">
       </div>
-    <% } %>
-    <% if (typeof error !== 'undefined' && error) { %>
-      <div class="alert alert-error shadow-lg max-w-5xl mx-auto my-4">
-        <div>
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          <span><%= error %></span>
-        </div>
-      </div>
-    <% } %>
 
-    <!-- Current Plan -->
-    <div class="max-w-5xl mx-auto mb-6">
-      <div class="card bg-base-200 shadow-xl">
-        <div class="card-body">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="card-title">Your Plan</h2>
-              <% if (currentUser && currentUser.isPremium) { %>
-                <p class="text-green-600 font-semibold">
-                  Premium ✅
-                  <% if (currentUser.subscriptionStatus) { %>
-                    <span class="ml-2 badge badge-success"><%= currentUser.subscriptionStatus %></span>
-                  <% } %>
-                </p>
-                <% if (currentUser.subscriptionEndsAt) { %>
-                  <p class="text-xs text-gray-500">
-                    Renews/ends: <%= new Date(currentUser.subscriptionEndsAt).toDateString() %>
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+        <!-- Header -->
+        <header class="mb-8 md:mb-10">
+          <div class="flex items-center gap-3">
+            <span class="inline-flex h-9 w-9 items-center justify-center rounded-full
+                         bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] shadow-xl">🔒</span>
+            <h1 class="text-3xl md:text-4xl font-extrabold leading-tight">
+              <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+                Choose your plan
+              </span>
+            </h1>
+          </div>
+          <p class="mt-2 text-white/70">
+            Unlock visibility, advanced filters, and priority vibes — no trials, just premium.
+          </p>
+        </header>
+
+        <!-- Flash messages -->
+        <% if (typeof success !== 'undefined' && success) { %>
+          <div class="rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl p-4 mb-4 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]">
+            <div class="flex items-center gap-3 text-emerald-300">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span><%= success %></span>
+            </div>
+          </div>
+        <% } %>
+        <% if (typeof error !== 'undefined' && error) { %>
+          <div class="rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl p-4 mb-4 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]">
+            <div class="flex items-center gap-3 text-rose-300">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              <span><%= error %></span>
+            </div>
+          </div>
+        <% } %>
+
+        <!-- Current plan -->
+        <section class="mb-8">
+          <div class="rounded-3xl border border-white/10 bg-black/60 backdrop-blur-xl p-5 md:p-6 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]">
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h2 class="text-lg font-semibold">Your plan</h2>
+                <% if (currentUser && currentUser.isPremium) { %>
+                  <p class="mt-1 text-emerald-300 font-medium">
+                    Premium ✅
+                    <% if (currentUser.subscriptionStatus) { %>
+                      <span class="ml-2 inline-flex items-center px-2 py-0.5 text-xs rounded-full border border-emerald-400/30 text-emerald-200 bg-emerald-400/10">
+                        <%= currentUser.subscriptionStatus %>
+                      </span>
+                    <% } %>
                   </p>
+                  <% if (currentUser.subscriptionEndsAt) { %>
+                    <p class="text-xs text-white/60 mt-1">
+                      Renews/ends: <%= new Date(currentUser.subscriptionEndsAt).toDateString() %>
+                    </p>
+                  <% } %>
+                <% } else { %>
+                  <p class="mt-1 text-white/70">Free tier</p>
                 <% } %>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <% if (currentUser && currentUser.isPremium && currentUser.stripeCustomerId) { %>
+                  <form action="/billing-portal" method="POST">
+                    <button class="btn rounded-full border-white/20 text-black hover:bg-white/10">
+                      Manage subscription
+                    </button>
+                  </form>
+                  <button id="cancelSubBtn"
+                          class="btn rounded-full border-white/20 text-rose-300 hover:bg-rose-500/10">
+                    Cancel at period end
+                  </button>
+                <% } else { %>
+                  <a href="#plans" class="btn rounded-full bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black hover:shadow-xl">
+                    View plans
+                  </a>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Billing toggle -->
+        <section class="mb-6">
+          <div class="rounded-full inline-flex items-center gap-2 px-2 py-2 border border-white/10 bg-black/60 backdrop-blur-xl">
+            <button id="billMonthly"
+                    class="px-4 py-1.5 rounded-full text-sm font-medium bg-white/10 hover:bg-white/15">
+              Monthly
+            </button>
+            <button id="billYearly"
+                    class="px-4 py-1.5 rounded-full text-sm font-medium text-white/80 hover:bg-white/10">
+              Yearly <span class="ml-1 inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black">Save</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Plans -->
+        <section id="plans" class="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
+
+          <!-- Free -->
+          <article class="rounded-3xl border border-white/10 bg-black/60 backdrop-blur-xl p-5 md:p-6
+                          shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+            <header class="mb-4">
+              <h3 class="text-2xl font-bold">Free</h3>
+              <p class="text-sm text-white/70 mt-1">Good for trying things out</p>
+            </header>
+
+            <div class="my-4">
+              <div class="flex items-end gap-2">
+                <div class="text-4xl font-extrabold">$0</div>
+                <div class="text-sm text-white/60">/ forever</div>
+              </div>
+            </div>
+
+            <ul class="space-y-2 text-sm text-white/85">
+              <li>• Limited daily likes</li>
+              <li>• Basic search filters</li>
+              <li>• Message matches</li>
+            </ul>
+
+            <div class="mt-6">
+              <% if (currentUser && !currentUser.isPremium) { %>
+                <button class="btn btn-disabled w-full rounded-full">Current plan</button>
               <% } else { %>
-                <p class="text-gray-700">Free Tier</p>
+                <a href="/dashboard" class="btn w-full rounded-full border-white/20 text-black hover:bg-white/10">Continue free</a>
               <% } %>
             </div>
-            <div class="flex items-center gap-3">
-              <% if (currentUser && currentUser.isPremium && currentUser.stripeCustomerId) { %>
-                <form action="/billing-portal" method="POST">
-                  <button class="btn btn-outline">Manage Subscription</button>
+          </article>
+
+          <!-- Premium (featured) -->
+          <article class="relative rounded-3xl border border-white/10 bg-black/60 backdrop-blur-xl p-5 md:p-6
+                          shadow-[0_20px_60px_-16px_rgba(255,107,107,.35)]
+                          ring-1 ring-[#FF6B6B]/20">
+            <div class="absolute -top-3 right-4">
+              <span class="px-2 py-0.5 text-xs rounded-full bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black shadow">
+                Popular
+              </span>
+            </div>
+
+            <header class="mb-4">
+              <h3 class="text-2xl font-bold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+                Premium
+              </h3>
+              <p class="text-sm text-white/80">Best value for most people</p>
+            </header>
+
+            <div class="my-4">
+              <div class="flex items-end gap-2">
+                <div class="text-4xl font-extrabold">
+                  <span class="price-monthly">$19.99</span>
+                  <span class="price-yearly hidden">$15.99</span>
+                </div>
+                <div class="text-sm text-white/70">/ <span class="unit-monthly">month</span><span class="unit-yearly hidden">month (billed yearly)</span></div>
+              </div>
+            </div>
+
+            <ul class="space-y-2 text-sm text-white/90">
+              <li>• Unlimited likes</li>
+              <li>• See who liked you</li>
+              <li>• Advanced filters</li>
+              <li>• 1 profile Boost / week</li>
+              <li>• Priority visibility</li>
+            </ul>
+
+            <div class="mt-6">
+              <% if (plan === 'premium' || plan === 'elite') { %>
+                <form action="/billing-portal" method="POST" class="w-full">
+                  <button class="btn w-full rounded-full border-white/20 text-black hover:bg-white/10" type="submit">
+                    Manage subscription
+                  </button>
                 </form>
-                <button id="cancelSubBtn" class="btn btn-warning">Cancel at period end</button>
               <% } else { %>
-                <a href="#plans" class="btn btn-primary">View Plans</a>
+                <a href="/checkout/premium"
+                   class="btn w-full rounded-full bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black hover:shadow-xl">
+                  Go Premium
+                </a>
               <% } %>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          </article>
 
-    <!-- Test Mode Notice -->
-    <div class="max-w-5xl mx-auto mb-6">
-      <div class="alert alert-info shadow-lg">
-        <div>
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/>
-          </svg>
-          <div>
-            <p class="font-semibold">Stripe Test Mode</p>
-            <p>Use test card <code>4242 4242 4242 4242</code> with any future expiry and any CVC.</p>
-          </div>
-        </div>
-      </div>
-    </div>
+          <!-- Elite -->
+          <article class="rounded-3xl border border-white/10 bg-black/60 backdrop-blur-xl p-5 md:p-6
+                          shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+            <header class="mb-4">
+              <h3 class="text-2xl font-bold">Elite</h3>
+              <p class="text-sm text-white/70">For power users</p>
+            </header>
 
-    <!-- Pricing Grid -->
-    <div id="plans" class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-      <!-- Free -->
-      <div class="card bg-base-200 shadow-xl">
-        <div class="card-body">
-          <h3 class="text-2xl font-bold">Free</h3>
-          <p class="text-sm text-gray-500">Good for trying things out</p>
-          <div class="my-4">
-            <div class="text-4xl font-extrabold">$0<span class="text-base font-normal text-gray-500"> / forever</span></div>
-          </div>
-          <ul class="space-y-2 text-sm">
-            <li>• Limited daily likes</li>
-            <li>• Basic search filters</li>
-            <li>• Message matches</li>
-          </ul>
-          <div class="card-actions mt-6">
-            <% if (currentUser && !currentUser.isPremium) { %>
-              <button class="btn btn-disabled w-full">Current Plan</button>
-            <% } else { %>
-              <a href="/dashboard" class="btn btn-outline w-full">Continue Free</a>
-            <% } %>
-          </div>
-        </div>
-      </div>
+            <div class="my-4">
+              <div class="flex items-end gap-2">
+                <div class="text-4xl font-extrabold">
+                  <span class="price-monthly">$39.99</span>
+                  <span class="price-yearly hidden">$31.99</span>
+                </div>
+                <div class="text-sm text-white/70">/ <span class="unit-monthly">month</span><span class="unit-yearly hidden">month (billed yearly)</span></div>
+              </div>
+            </div>
 
-      <!-- Premium -->
-      <div class="card bg-primary text-primary-content shadow-xl border-2 border-primary">
-        <div class="card-body">
-          <div class="flex items-center justify-between">
-            <h3 class="text-2xl font-bold">Premium</h3>
-            <span class="badge badge-accent">Popular</span>
-          </div>
-          <p class="text-sm opacity-80">Best value for most people</p>
-          <div class="my-4">
-            <div class="text-4xl font-extrabold">$19.99<span class="text-base font-normal opacity-80"> / month</span></div>
-          </div>
-          <ul class="space-y-2 text-sm">
-            <li>• Unlimited likes</li>
-            <li>• See who liked you</li>
-            <li>• Advanced filters</li>
-            <li>• 1 profile Boost / week</li>
-            <li>• Priority visibility</li>
-          </ul>
-          <div class="card-actions mt-6">
-          <% if (plan === 'premium' || plan === 'elite') { %>
-            <form action="/billing-portal" method="POST" class="w-full">
-              <button class="btn btn-outline w-full" type="submit">Manage subscription</button>
-              </form>
+            <ul class="space-y-2 text-sm text-white/90">
+              <li>• Everything in Premium</li>
+              <li>• Super Likes bundle</li>
+              <li>• VIP badge & support</li>
+              <li>• Top Picks daily</li>
+              <li>• Event invites</li>
+            </ul>
+
+            <div class="mt-6">
+              <% if (plan === 'elite') { %>
+                <form action="/billing-portal" method="POST" class="w-full">
+                  <button class="btn w-full rounded-full border-white/20 text-black hover:bg-white/10" type="submit">
+                    Manage Elite
+                  </button>
+                </form>
               <% } else { %>
-              <!-- Navigate to Stripe (GET) -->
-              <a href="/checkout/premium" class="btn btn-primary w-full">Go Premium</a>
-              <% } %>
-          </div>
-        </div>
-      </div>
-
-      <!-- Elite -->
-      <div class="card bg-base-200 shadow-xl">
-        <div class="card-body">
-          <h3 class="text-2xl font-bold">Elite</h3>
-          <p class="text-sm text-gray-500">For power users</p>
-          <div class="my-4">
-            <div class="text-4xl font-extrabold">$39.99<span class="text-base font-normal text-gray-500"> / month</span></div>
-          </div>
-          <ul class="space-y-2 text-sm">
-            <li>• Everything in Premium</li>
-            <li>• Super Likes bundle</li>
-            <li>• VIP badge & support</li>
-            <li>• Top Picks daily</li>
-            <li>• Event invites</li>
-          </ul>
-          <div class="card-actions mt-6">
-            <% if (plan === 'elite') { %>
-            <form action="/billing-portal" method="POST" class="w-full">
-              <button class="btn btn-outline w-full" type="submit">Manage Elite</button>
-              </form>
-              <% } else { %>
-              <!-- Navigate to Stripe (GET) -->
-              <a href="/checkout/elite" class="btn btn-primary w-full">Go Elite</a>
+                <a href="/checkout/elite"
+                   class="btn w-full rounded-full bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black hover:shadow-xl">
+                  Go Elite
+                </a>
               <% } %>
             </div>
-        </div>
+          </article>
+        </section>
+
+        <!-- Why upgrade -->
+        <section class="mt-10 grid md:grid-cols-3 gap-4">
+          <div class="rounded-3xl border border-white/10 bg-black/60 backdrop-blur-xl p-5">
+            <div class="text-2xl">🚀</div>
+            <h4 class="mt-2 font-semibold">Get seen first</h4>
+            <p class="text-sm text-white/70 mt-1">Priority placement boosts your daily reach.</p>
+          </div>
+          <div class="rounded-3xl border border-white/10 bg-black/60 backdrop-blur-xl p-5">
+            <div class="text-2xl">🧭</div>
+            <h4 class="mt-2 font-semibold">Dial your type</h4>
+            <p class="text-sm text-white/70 mt-1">Advanced filters (photos, distance, lifestyle) that fit you.</p>
+          </div>
+          <div class="rounded-3xl border border-white/10 bg-black/60 backdrop-blur-xl p-5">
+            <div class="text-2xl">💬</div>
+            <h4 class="mt-2 font-semibold">Match with intent</h4>
+            <p class="text-sm text-white/70 mt-1">See who liked you so you can start with a spark.</p>
+          </div>
+        </section>
+
       </div>
-    </div>
+    </main>
 
-    <!-- FAQ / Notes -->
-    <div class="max-w-5xl mx-auto mt-10">
-      <div class="collapse collapse-arrow bg-base-200">
-        <input type="checkbox" />
-        <div class="collapse-title text-lg font-medium">
-          How does billing work?
-        </div>
-        <div class="collapse-content text-sm text-gray-600">
-          <p>Plans renew monthly. You can cancel anytime via the <em>Manage Subscription</em> button, which opens the customer portal.</p>
-        </div>
-      </div>
-      <div class="collapse collapse-arrow bg-base-200 mt-2">
-        <input type="checkbox" />
-        <div class="collapse-title text-lg font-medium">
-          What happens after I upgrade?
-        </div>
-        <div class="collapse-content text-sm text-gray-600">
-          <p>On successful payment, your account is marked <strong>Premium</strong>/<strong>Elite</strong>. Your plan shows above; you can manage it any time.</p>
-        </div>
-      </div>
-    </div>
-  </div>
+    <!-- FOOTER -->
+    <%- include('partials/footer.ejs') %>
 
-  <%- include('partials/footer.ejs') %>
+    <!-- Scripts -->
+    <script>
+      // Monthly / Yearly toggle (no server changes needed)
+      (function () {
+        const m = document.getElementById('billMonthly');
+        const y = document.getElementById('billYearly');
+        const mEls = document.querySelectorAll('.price-monthly, .unit-monthly');
+        const yEls = document.querySelectorAll('.price-yearly, .unit-yearly');
 
-  <!-- (Leftover) Script: safe to keep; does nothing if the button doesn't exist -->
-  <script>
-    (function () {
-      const upgradeBtn = document.getElementById('upgradeBtn');
-      if (!upgradeBtn) return;
-      upgradeBtn.addEventListener('click', async () => {});
-    })();
+        function setMode(mode) {
+          const yearly = mode === 'yearly';
+          m.classList.toggle('bg-white/10', !yearly);
+          y.classList.toggle('bg-white/10', yearly);
 
-    // Cancel at period end (if premium)
-    (function () {
-      const cancelBtn = document.getElementById('cancelSubBtn');
-      if (!cancelBtn) return;
-
-      cancelBtn.addEventListener('click', async () => {
-        if (!confirm('Cancel your subscription at period end?')) return;
-
-        const original = cancelBtn.textContent;
-        cancelBtn.disabled = true;
-        cancelBtn.textContent = 'Processing…';
-
-        try {
-          const res = await fetch('/subscription/cancel', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin'
-          });
-          const data = await res.json();
-          if (data?.status === 'cancelling') {
-            alert(`Your subscription will end on ${new Date(data.endsAt).toDateString()}.`);
-            location.reload();
-            return;
-          }
-          throw new Error(data?.error || 'Unknown error');
-        } catch (err) {
-          console.error('Cancel error:', err);
-          alert('Failed to cancel. Please try again.');
-          cancelBtn.disabled = false;
-          cancelBtn.textContent = original;
+          mEls.forEach(el => el.classList.toggle('hidden', yearly));
+          yEls.forEach(el => el.classList.toggle('hidden', !yearly));
         }
-      });
-    })();
-  </script>
-</body>
+
+        m?.addEventListener('click', () => setMode('monthly'));
+        y?.addEventListener('click', () => setMode('yearly'));
+        setMode('monthly');
+      })();
+
+      // Cancel at period end
+      (function () {
+        const cancelBtn = document.getElementById('cancelSubBtn');
+        if (!cancelBtn) return;
+        cancelBtn.addEventListener('click', async () => {
+          if (!confirm('Cancel your subscription at period end?')) return;
+          const orig = cancelBtn.textContent;
+          cancelBtn.disabled = true;
+          cancelBtn.textContent = 'Processing…';
+          try {
+            const res = await fetch('/subscription/cancel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin'
+            });
+            const data = await res.json().catch(() => ({}));
+            if (data?.status === 'cancelling') {
+              alert(`Your subscription will end on ${new Date(data.endsAt).toDateString()}.`);
+              location.reload();
+              return;
+            }
+            throw new Error(data?.error || 'Unknown error');
+          } catch (err) {
+            console.error('Cancel error:', err);
+            alert('Failed to cancel. Please try again.');
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = orig;
+          }
+        });
+      })();
+    </script>
+  </body>
 </html>

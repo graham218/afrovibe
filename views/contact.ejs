@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="afrovibe">
+  <%- include('partials/head', { pageTitle: (pageTitle || 'Contact') }) %>
+<body class="bg-black text-white min-h-screen flex flex-col">
+  <%- include('partials/navbar', { currentUser }) %>
+
+  <main class="relative isolation-isolate z-10 max-w-3xl mx-auto px-4 md:px-6 lg:px-8 py-10 flex-1">
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10
+         bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.12),transparent_60%),radial-gradient(60%_40%_at_80%_100%,rgba(254,202,87,.10),transparent_60%)]"></div>
+
+    <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 p-6 md:p-8">
+      <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+        Contact Us
+      </h1>
+
+      <% if (sent) { %>
+        <div class="alert alert-success mt-4 rounded-2xl border-white/10 bg-white/10 text-white">
+          <span>✅ Thanks! We received your message and will reply soon.</span>
+        </div>
+      <% } %>
+
+      <form class="mt-6 grid gap-4" method="post" action="/contact">
+        <label class="form-control">
+          <span class="label-text text-white/80">Name</span>
+          <input class="input input-bordered bg-black/40 border-white/20 text-white" name="name" required />
+        </label>
+        <label class="form-control">
+          <span class="label-text text-white/80">Email</span>
+          <input type="email" class="input input-bordered bg-black/40 border-white/20 text-white" name="email" required />
+        </label>
+        <label class="form-control">
+          <span class="label-text text-white/80">Message</span>
+          <textarea rows="5" class="textarea textarea-bordered bg-black/40 border-white/20 text-white" name="message" required></textarea>
+        </label>
+
+        <div class="mt-2">
+          <button class="btn rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">
+            Send
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <%- include('partials/footer') %>
+</body>
+</html>

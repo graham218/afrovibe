@@ -2,26 +2,66 @@
 <html lang="en" data-theme="afrovibe">
 <head>
   <%- include('partials/head.ejs', { pageTitle: 'Messages' }) %>
+  <style>
+    /* --- AfroVibe micro-utilities (safe to inline) --- */
+    .btn-gradient {
+      background-image: linear-gradient(90deg,#FF6B6B, #FECA57);
+      color:#111 !important;
+      border-color: transparent !important;
+    }
+    .btn-gradient:hover { filter: brightness(1.03); box-shadow: 0 20px 40px -16px rgba(255,107,107,.45); transform: translateY(-1px); }
+    .badge-gradient {
+      background-image: linear-gradient(90deg,rgba(255,107,107,.9), rgba(254,202,87,.9));
+      color:#111;
+      border:0;
+    }
+    .card-glass { background: rgba(0,0,0,.60); backdrop-filter: blur(18px); border: 1px solid rgba(255,255,255,.10); }
+    .hover-glow:hover { box-shadow: 0 16px 50px -14px rgba(0,0,0,.75); }
+    .ring-soft { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+
+    /* Motion-safe hover niceties */
+    @media (prefers-reduced-motion:no-preference){
+      .hover-zoom  { transition: transform .25s ease, box-shadow .25s ease, background .25s ease; }
+      .hover-zoom:hover { transform: scale(1.02); }
+      .avatar-zoom img { transition: transform .25s ease; }
+      .avatar-zoom:hover img { transform: scale(1.06); }
+      .pulse-soft { animation: pulseSoft 1.2s ease-in-out infinite; }
+      @keyframes pulseSoft { 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.06); } }
+    }
+  </style>
 </head>
-<body class="bg-base-100 min-h-screen flex flex-col">
+
+<body class="bg-black text-white min-h-screen flex flex-col">
   <%- include('partials/navbar.ejs', { currentUser, unreadMessages, unreadNotificationCount }) %>
 
   <!-- Current user id for client JS -->
   <input type="hidden" id="currentUserId" value="<%= currentUser?._id %>">
 
-  <main class="flex-1 max-w-6xl mx-auto w-full p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+  <!-- MAIN -->
+  <main class="relative isolation-isolate flex-1 max-w-6xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+
+    <!-- soft page overlay inside main only -->
+    <div aria-hidden="true"
+         class="pointer-events-none absolute inset-0 -z-10 opacity-90
+                bg-[radial-gradient(60%_50%_at_20%_0%,rgba(255,107,107,.12),transparent_60%),radial-gradient(50%_40%_at_100%_100%,rgba(254,202,87,.10),transparent_60%)]">
+    </div>
+
     <!-- LEFT: Thread list -->
-    <aside class="md:col-span-1">
-      <div class="flex items-center justify-between mb-3">
-        <h1 class="text-xl font-semibold">Messages</h1>
+    <aside class="md:col-span-1 space-y-3">
+      <div class="flex items-center justify-between">
+        <h1 class="text-xl md:text-2xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+          Messages
+        </h1>
+
         <div class="flex items-center gap-2">
-          <button id="enterManage"   class="btn btn-ghost btn-xs">Manage</button>
-          <button id="cancelManage"  class="btn btn-ghost btn-xs hidden">Cancel</button>
-          <button id="deleteThreads" class="btn btn-error btn-xs hidden">Delete</button>
+          <button id="enterManage"   class="btn btn-ghost btn-xs text-white/90 hover:bg-white/10 rounded-full">Manage</button>
+          <button id="cancelManage"  class="btn btn-ghost btn-xs hidden text-white/90 hover:bg-white/10 rounded-full">Cancel</button>
+          <button id="deleteThreads" class="btn btn-xs hidden rounded-full btn-gradient">Delete</button>
         </div>
       </div>
 
-      <ul id="threadList" class="menu bg-base-100 rounded-2xl border border-base-300/70 overflow-hidden shadow-sm">
+      <ul id="threadList"
+          class="menu rounded-2xl card-glass ring-soft overflow-hidden hover-glow">
         <% (matches || []).forEach(u => {
              const p0 = u?.profile?.photos?.[0] || '/images/default-avatar.png';
              const unread = (unreadBy && unreadBy[String(u._id)]) || 0;
@@ -32,11 +72,12 @@
                ? (last.createdAt.toLocaleString ? last.createdAt.toLocaleString() : new Date(last.createdAt).toLocaleString())
                : '';
         %>
-          <li class="border-b last:border-0" data-user-id="<%= u._id %>">
-            <a href="/chat/<%= u._id %>" class="rowLink flex items-center gap-3 py-3 px-3 hover:bg-base-200/50 transition">
+          <li class="border-b border-white/10 last:border-0" data-user-id="<%= u._id %>">
+            <a href="/chat/<%= u._id %>"
+               class="rowLink hover-zoom flex items-center gap-3 py-3 px-3 hover:bg-white/5 transition">
               <!-- Avatar -->
-              <div class="avatar">
-                <div class="w-10 h-10 rounded-full ring ring-base-300 ring-offset-2 overflow-hidden">
+              <div class="avatar avatar-zoom">
+                <div class="w-10 h-10 rounded-full ring ring-white/10 ring-offset-2 ring-offset-black overflow-hidden">
                   <img src="<%= p0 %>" alt="<%= u.username %> avatar" class="object-cover">
                 </div>
               </div>
@@ -46,9 +87,9 @@
                 <div class="flex items-center gap-2">
                   <div class="truncate <%= unread ? 'font-semibold' : 'font-medium' %>"><%= u.username %></div>
                   <% if (unread) { %>
-                    <span class="badge badge-error badge-sm" data-unread-for="<%= u._id %>"><%= unread %></span>
+                    <span class="badge badge-sm badge-gradient pulse-soft" data-unread-for="<%= u._id %>"><%= unread %></span>
                   <% } else { %>
-                    <span class="badge badge-error badge-sm hidden" data-unread-for="<%= u._id %>">0</span>
+                    <span class="badge badge-sm badge-gradient hidden" data-unread-for="<%= u._id %>">0</span>
                   <% } %>
                 </div>
                 <div class="flex items-center gap-2 text-xs">
@@ -60,10 +101,11 @@
                     <% } %>
                   </div>
                   <% if (ts) { %>
-                    <span class="opacity-50 shrink-0">•</span>
+                    <span class="opacity-40 shrink-0">•</span>
                     <time class="opacity-60 shrink-0"><%= ts %></time>
                   <% } %>
                 </div>
+
               </div>
 
               <!-- Checkbox (Manage mode) -->
@@ -81,17 +123,22 @@
         <% } %>
       </ul>
 
-      <p id="manageTip" class="text-[12px] opacity-60 mt-2 hidden">
+      <p id="manageTip" class="text-[12px] opacity-60 mt-1 hidden">
         Select conversations to delete. This hides the thread for you.
       </p>
     </aside>
 
     <!-- RIGHT: Empty state panel (chat opens on /chat/:id) -->
     <section class="md:col-span-2">
-      <div class="card bg-base-100 border border-base-300/70 rounded-2xl shadow-sm h-full grid place-items-center p-8">
-        <div class="text-center space-y-2">
-          <div class="text-2xl font-semibold">Select a conversation</div>
-          <div class="opacity-70">Click any match on the left to open the chat thread.</div>
+      <div class="card card-glass rounded-2xl shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] h-full grid place-items-center p-8">
+        <div class="text-center space-y-2 max-w-md">
+          <div class="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+            Select a conversation
+          </div>
+          <div class="opacity-80">Click any match on the left to open the chat thread.</div>
+          <div class="mt-3">
+            <a href="/advanced-search" class="btn btn-sm rounded-full btn-gradient">Find more matches</a>
+          </div>
         </div>
       </div>
     </section>
@@ -100,7 +147,7 @@
   <%- include('partials/modals.ejs') %>
   <%- include('partials/footer.ejs') %>
 
-  <!-- JS -->
+  <!-- JS (unchanged) -->
   <script src="/socket.io/socket.io.js" nonce="<%= typeof cspNonce !== 'undefined' ? cspNonce : '' %>" defer></script>
   <script src="/js/socket.helper.js"      nonce="<%= typeof cspNonce !== 'undefined' ? cspNonce : '' %>" defer></script>
   <script src="/js/page-messages.js?v=5"  nonce="<%= typeof cspNonce !== 'undefined' ? cspNonce : '' %>" defer></script>

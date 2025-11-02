@@ -3,83 +3,137 @@
 <head>
   <%- include('partials/head.ejs', { pageTitle: 'Matches' }) %>
 </head>
-<body class="bg-base-100 min-h-screen flex flex-col">
+
+<body class="min-h-screen flex flex-col bg-black text-white">
+  <!-- Navbar (unchanged include) -->
   <%- include('partials/navbar.ejs', { currentUser, unreadMessages, unreadNotificationCount }) %>
 
-    <main class="container mx-auto px-5 md:px-6 py-6 flex-grow">
+  <!-- Main -->
+  <main class="flex-grow relative isolation-isolate">
+    <!-- Subtle page glow behind content -->
+    <div aria-hidden="true"
+         class="pointer-events-none absolute inset-0 -z-10
+                bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.10),transparent_60%),radial-gradient(60%_40%_at_80%_100%,rgba(254,202,87,.10),transparent_60%)]">
+    </div>
+
+    <div class="container mx-auto px-5 md:px-6 py-6">
       <!-- Section header -->
-      <header class="flex items-center justify-between mb-5">
+      <header class="flex items-center justify-between mb-6">
         <div>
-          <h1 class="text-lg md:text-xl font-semibold">Matches</h1>
-          <p class="text-xs md:text-sm opacity-70">Message mutual matches, or like back to unlock chat.</p>
+          <h1 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+            Matches
+          </h1>
+          <p class="text-xs md:text-sm text-white/70">
+            Message mutual matches, or like back to unlock chat.
+          </p>
         </div>
-        <a href="/advanced-search" class="btn btn-sm btn-outline">Filters</a>
+
+        <a href="/advanced-search"
+           class="btn btn-sm rounded-full border-0 text-black
+                  bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]
+                  hover:shadow-xl hover:scale-[1.02] transition">
+          Filters
+        </a>
       </header>
 
       <% if (!matches || matches.length === 0) { %>
-        <div class="max-w-xl mx-auto bg-base-200 rounded-2xl p-8 text-center">
-          <p>No matches yet. Keep discovering on the dashboard.</p>
-          <a href="/dashboard" class="btn btn-primary mt-3">Discover</a>
+        <!-- Empty state -->
+        <div class="max-w-2xl mx-auto rounded-3xl p-10 text-center
+                    bg-black/60 backdrop-blur-xl border border-white/10
+                    shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]">
+          <h2 class="text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+            No matches yet
+          </h2>
+          <p class="mt-2 text-sm text-white/70">Keep discovering on the dashboard.</p>
+          <a href="/dashboard"
+             class="mt-4 inline-flex btn rounded-full border-0 text-black
+                    bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]
+                    hover:shadow-xl hover:scale-[1.02] transition">
+            Discover
+          </a>
         </div>
       <% } %>
 
       <!-- Grid -->
-      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <% (matches || []).forEach(m => {
              const photos = (m.profile?.photos || []);
              const photo  = photos[0] || '/images/default-avatar.png';
              const cityCountry = [m.profile?.city, m.profile?.country].filter(Boolean).join(', ');
              const isOnline = m.lastActive && (Date.now() - new Date(m.lastActive).getTime() < 5*60*1000);
         %>
-          <article class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow rounded-2xl overflow-hidden">
+          <article
+            class="group rounded-3xl overflow-hidden border border-white/10 bg-black/60 backdrop-blur-xl
+                   shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]
+                   hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)]
+                   transition-transform hover:scale-[1.02]">
             <!-- Photo / badges -->
             <div class="relative">
-              <img src="<%= photo %>" alt="<%= m.username %>" class="w-full aspect-[4/5] object-cover">
+              <img src="<%= photo %>"
+                   alt="<%= m.username %>"
+                   class="w-full aspect-[4/5] object-cover transition duration-300 group-hover:scale-105" />
 
               <!-- Top-left chips -->
               <div class="absolute left-2 top-2 flex items-center gap-1">
                 <% if (m.isNew) { %>
-                  <span class="badge badge-xs rounded-full bg-accent text-white border-0">NEW</span>
+                  <span class="badge badge-xs rounded-full border-0
+                               bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black">
+                    NEW
+                  </span>
                 <% } %>
                 <% if (m.verifiedAt) { %>
-                  <span class="badge badge-xs rounded-full bg-emerald-600 text-white border-0">Verified</span>
+                  <span class="badge badge-xs rounded-full border border-white/20 bg-black/60 text-emerald-300">
+                    Verified
+                  </span>
                 <% } %>
                 <% if (isOnline) { %>
-                  <span class="badge badge-xs rounded-full bg-info text-white border-0">Online</span>
+                  <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]
+                               bg-black/60 border border-white/10 text-white/90">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    now
+                  </span>
                 <% } %>
               </div>
 
               <!-- Unread bubble -->
               <% if (m.unreadCount > 0) { %>
-                <span class="absolute top-2 right-2 badge badge-error badge-sm"><%= m.unreadCount > 99 ? '99+' : m.unreadCount %></span>
+                <span class="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[11px]
+                             bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] text-black
+                             border border-white/10 shadow-sm animate-pulse">
+                  <%= m.unreadCount > 99 ? '99+' : m.unreadCount %>
+                </span>
               <% } %>
             </div>
 
             <!-- Body -->
             <div class="p-3">
               <div class="flex items-start justify-between gap-2">
-                <h3 class="text-[16px] font-semibold leading-tight truncate">
-                  <%= m.username %><% if (m.profile?.age) { %>, <%= m.profile.age %><% } %>
+                <h3 class="text-[15px] md:text-[16px] font-semibold leading-tight truncate">
+                  <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+                    <%= m.username %>
+                  </span>
+                  <% if (m.profile?.age) { %>
+                    <span class="text-white/80">, <%= m.profile.age %></span>
+                  <% } %>
                 </h3>
 
                 <!-- Subtle online dot (secondary cue) -->
                 <% if (isOnline) { %>
                   <span class="mt-0.5 inline-flex items-center">
-                    <span class="w-2 h-2 rounded-full bg-success mr-1"></span>
-                    <span class="text-[11px] opacity-70">now</span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1"></span>
+                    <span class="text-[11px] text-white/70">now</span>
                   </span>
                 <% } %>
               </div>
 
-              <p class="text-xs opacity-70 mt-1 truncate">
-                <%= cityCountry || '—' %>
-              </p>
+              <p class="text-xs text-white/70 mt-1 truncate"><%= cityCountry || '—' %></p>
 
               <% if (m.lastMessage) { %>
-                <div class="mt-3 text-[12px] bg-base-200 rounded-lg p-2">
-                  <span class="opacity-70"><%= m.lastMessage.mine ? 'You: ' : '' %></span>
+                <div class="mt-3 text-[12px] rounded-xl p-2
+                            bg-black/50 border border-white/10">
+                  <span class="text-white/60"><%= m.lastMessage.mine ? 'You: ' : '' %></span>
                   <span class="line-clamp-2"><%= m.lastMessage.content %></span>
-                  <div class="text-[10px] opacity-60 mt-1">
+                  <div class="text-[10px] text-white/50 mt-1">
                     <%= new Date(m.lastMessage.createdAt).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) %>
                   </div>
                 </div>
@@ -87,27 +141,46 @@
 
               <!-- Actions -->
               <div class="mt-3 grid grid-cols-2 gap-2">
-                <a href="/users/<%= m._id %>" class="btn btn-ghost btn-xs border border-base-300">Profile</a>
+                <a href="/users/<%= m._id %>"
+                   class="btn btn-ghost btn-xs rounded-full text-white/90
+                          border border-white/15 hover:bg-white/10 hover:border-white/25 transition">
+                  Profile
+                </a>
 
                 <% if (m.isMutual) { %>
-                  <a class="btn btn-primary btn-xs" href="/chat/<%= m._id %>">Message</a>
+                  <a class="btn btn-xs rounded-full border-0 text-black
+                            bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]
+                            hover:shadow-xl hover:scale-[1.02] transition"
+                     href="/chat/<%= m._id %>">
+                    Message
+                  </a>
                 <% } else if (m.likedMeOnly) { %>
-                  <button class="btn btn-outline btn-xs like-back" data-user-id="<%= m._id %>" data-username="<%= m.username %>">
+                  <button
+                    class="btn btn-outline btn-xs like-back rounded-full
+                           border-white/20 text-white
+                           hover:!bg-gradient-to-r hover:!from-[#FF6B6B] hover:!to-[#FECA57]
+                           hover:!text-black hover:!border-transparent hover:shadow-xl transition"
+                    data-user-id="<%= m._id %>"
+                    data-username="<%= m.username %>">
                     💜 Like back
                   </button>
                 <% } else { %>
-                  <button class="btn btn-ghost btn-xs border border-base-300" disabled>Pending</button>
+                  <button class="btn btn-ghost btn-xs rounded-full text-white/60 border border-white/10" disabled>
+                    Pending
+                  </button>
                 <% } %>
               </div>
             </div>
           </article>
         <% }) %>
       </div>
-    </main>
+    </div>
+  </main>
 
-    <%- include('partials/footer.ejs') %>
+  <!-- Footer (unchanged include) -->
+  <%- include('partials/footer.ejs') %>
 
-    <!-- Page script (CSP-safe) -->
-    <script nonce="<%= cspNonce %>" src="/js/matches.js" defer></script>
-  </body>
+  <!-- Page script (CSP-safe) -->
+  <script nonce="<%= cspNonce %>" src="/js/matches.js" defer></script>
+</body>
 </html>

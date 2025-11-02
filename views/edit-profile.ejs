@@ -1,178 +1,243 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="afrovibe">
   <%- include('partials/head.ejs', { pageTitle: 'Edit Profile' }) %>
-  <body class="bg-base-100 min-h-screen flex flex-col">
+  <body class="bg-black text-white min-h-screen flex flex-col selection:bg-[#FECA57]/30 selection:text-white">
     <%- include('partials/navbar.ejs') %>
 
-    <main class="container mx-auto px-4 sm:px-6 md:px-8 py-6 flex-1">
-      <header class="mb-5">
-        <h1 class="text-2xl md:text-3xl font-bold">Edit profile</h1>
-        <p class="text-sm opacity-70">Update your details. Changes appear on your public profile.</p>
+    <main class="container mx-auto px-4 sm:px-6 md:px-8 py-8 flex-1 relative isolation-isolate">
+      <!-- subtle background bloom just for this page area -->
+      <div aria-hidden="true"
+           class="pointer-events-none absolute inset-0 -z-10
+                  bg-[radial-gradient(60%_50%_at_20%_0%,rgba(255,107,107,.12),transparent_60%),radial-gradient(60%_40%_at_100%_100%,rgba(254,202,87,.10),transparent_60%)]"></div>
+
+      <header class="mb-6 md:mb-8">
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+          Edit profile
+        </h1>
+        <p class="text-sm text-white/80 mt-1">Update your details. Changes appear on your public profile.</p>
       </header>
 
-      <form action="/edit-profile" method="post" class="space-y-6">
+      <form action="/edit-profile" method="post" class="space-y-6 md:space-y-8">
         <!-- Basics -->
-        <section class="card bg-base-100 shadow">
-          <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
-            <h2 class="card-title md:col-span-2">Basics</h2>
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+          <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <h2 class="md:col-span-2 text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Basics
+            </h2>
 
             <label class="form-control">
-              <span class="label-text">Username</span>
-              <input name="username" class="input input-bordered" value="<%- currentUser?.username || '' %>" required>
+              <span class="label-text text-white/80">Username</span>
+              <input name="username" required
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.username || '' %>">
             </label>
 
             <label class="form-control">
-              <span class="label-text">Age</span>
-              <input name="age" type="number" min="18" max="100" class="input input-bordered" value="<%- currentUser?.profile?.age || '' %>">
+              <span class="label-text text-white/80">Age</span>
+              <input name="age" type="number" min="18" max="100"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.age || '' %>">
             </label>
 
             <label class="form-control">
-              <span class="label-text">Gender</span>
-              <input name="gender" class="input input-bordered" value="<%- currentUser?.profile?.gender || '' %>">
+              <span class="label-text text-white/80">Gender</span>
+              <input name="gender"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.gender || '' %>">
             </label>
 
             <label class="form-control md:col-span-2">
-              <span class="label-text">Bio</span>
-              <textarea name="bio" rows="4" class="textarea textarea-bordered"><%- currentUser?.profile?.bio || '' %></textarea>
+              <span class="label-text text-white/80">Bio</span>
+              <textarea name="bio" rows="4"
+                        class="textarea textarea-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"><%- currentUser?.profile?.bio || '' %></textarea>
             </label>
           </div>
         </section>
 
         <!-- Location -->
-        <section class="card bg-base-100 shadow">
-          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
-            <h2 class="card-title md:col-span-3">Location</h2>
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+          <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <h2 class="md:col-span-3 text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Location
+            </h2>
 
             <label class="form-control">
-              <span class="label-text">Country</span>
-              <input name="country" class="input input-bordered" value="<%- currentUser?.profile?.country || '' %>">
+              <span class="label-text text-white/80">Country</span>
+              <input name="country"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.country || '' %>">
             </label>
             <label class="form-control">
-              <span class="label-text">State/Province</span>
-              <input name="stateProvince" class="input input-bordered" value="<%- currentUser?.profile?.stateProvince || '' %>">
+              <span class="label-text text-white/80">State/Province</span>
+              <input name="stateProvince"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.stateProvince || '' %>">
             </label>
             <label class="form-control">
-              <span class="label-text">City</span>
-              <input name="city" class="input input-bordered" value="<%- currentUser?.profile?.city || '' %>">
+              <span class="label-text text-white/80">City</span>
+              <input name="city"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.city || '' %>">
             </label>
           </div>
         </section>
 
         <!-- Work & Education -->
-        <section class="card bg-base-100 shadow">
-          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
-            <h2 class="card-title md:col-span-3">Work & education</h2>
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+          <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <h2 class="md:col-span-3 text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Work & education
+            </h2>
 
             <label class="form-control">
-              <span class="label-text">Occupation</span>
-              <input name="occupation" class="input input-bordered" value="<%- currentUser?.profile?.occupation || '' %>">
+              <span class="label-text text-white/80">Occupation</span>
+              <input name="occupation"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.occupation || '' %>">
             </label>
             <label class="form-control">
-              <span class="label-text">Employment status</span>
-              <input name="employmentStatus" class="input input-bordered" value="<%- currentUser?.profile?.employmentStatus || '' %>">
+              <span class="label-text text-white/80">Employment status</span>
+              <input name="employmentStatus"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.employmentStatus || '' %>">
             </label>
             <label class="form-control">
-              <span class="label-text">Education level</span>
-              <input name="educationLevel" class="input input-bordered" value="<%- currentUser?.profile?.educationLevel || '' %>">
+              <span class="label-text text-white/80">Education level</span>
+              <input name="educationLevel"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.educationLevel || '' %>">
             </label>
           </div>
         </section>
 
         <!-- Background -->
-        <section class="card bg-base-100 shadow">
-          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
-            <h2 class="card-title md:col-span-3">Background</h2>
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+          <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <h2 class="md:col-span-3 text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Background
+            </h2>
 
             <label class="form-control">
-              <span class="label-text">Nationality</span>
-              <input name="nationality" class="input input-bordered" value="<%- currentUser?.profile?.nationality || '' %>">
+              <span class="label-text text-white/80">Nationality</span>
+              <input name="nationality"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.nationality || '' %>">
             </label>
             <label class="form-control">
-              <span class="label-text">Religion</span>
-              <input name="religion" class="input input-bordered" value="<%- currentUser?.profile?.religion || '' %>">
+              <span class="label-text text-white/80">Religion</span>
+              <input name="religion"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.religion || '' %>">
             </label>
             <label class="form-control">
-              <span class="label-text">Star sign</span>
-              <input name="starSign" class="input input-bordered" value="<%- currentUser?.profile?.starSign || '' %>">
+              <span class="label-text text-white/80">Star sign</span>
+              <input name="starSign"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.starSign || '' %>">
             </label>
 
             <label class="form-control md:col-span-3">
-              <span class="label-text">Languages (comma separated)</span>
-              <input name="languagesSpoken" class="input input-bordered"
+              <span class="label-text text-white/80">Languages (comma separated)</span>
+              <input name="languagesSpoken"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
                      value="<%- (currentUser?.profile?.languagesSpoken || currentUser?.profile?.languages || []).join(', ') %>">
             </label>
           </div>
         </section>
 
         <!-- Lifestyle -->
-        <section class="card bg-base-100 shadow">
-          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
-            <h2 class="card-title md:col-span-3">Lifestyle</h2>
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+          <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <h2 class="md:col-span-3 text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Lifestyle
+            </h2>
 
             <label class="form-control">
-              <span class="label-text">Drinks</span>
-              <input name="drinks" class="input input-bordered" value="<%- currentUser?.profile?.drinks || '' %>">
+              <span class="label-text text-white/80">Drinks</span>
+              <input name="drinks"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.drinks || '' %>">
             </label>
             <label class="form-control">
-              <span class="label-text">Smokes</span>
-              <input name="smokes" class="input input-bordered" value="<%- currentUser?.profile?.smokes || '' %>">
+              <span class="label-text text-white/80">Smokes</span>
+              <input name="smokes"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.smokes || '' %>">
             </label>
             <label class="form-control">
-              <span class="label-text">Pets (comma separated)</span>
-              <input name="pets" class="input input-bordered" value="<%- (currentUser?.profile?.pets || []).join(', ') %>">
+              <span class="label-text text-white/80">Pets (comma separated)</span>
+              <input name="pets"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- (currentUser?.profile?.pets || []).join(', ') %>">
             </label>
 
             <label class="form-control md:col-span-3">
-              <span class="label-text">Body art (comma separated)</span>
-              <input name="bodyArt" class="input input-bordered" value="<%- (currentUser?.profile?.bodyArt || []).join(', ') %>">
+              <span class="label-text text-white/80">Body art (comma separated)</span>
+              <input name="bodyArt"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- (currentUser?.profile?.bodyArt || []).join(', ') %>">
             </label>
           </div>
         </section>
 
         <!-- Relationship & family -->
-        <section class="card bg-base-100 shadow">
-          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
-            <h2 class="card-title md:col-span-3">Relationship & family</h2>
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+          <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <h2 class="md:col-span-3 text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Relationship & family
+            </h2>
 
             <label class="form-control md:col-span-3">
-              <span class="label-text">Looking for (comma separated)</span>
-              <input name="relationshipLookingFor" class="input input-bordered"
+              <span class="label-text text-white/80">Looking for (comma separated)</span>
+              <input name="relationshipLookingFor"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
                      value="<%- (currentUser?.profile?.relationshipLookingFor || []).join(', ') %>">
             </label>
 
             <label class="form-control">
-              <span class="label-text">Children</span>
-              <input name="children" class="input input-bordered" value="<%- currentUser?.profile?.children || '' %>">
+              <span class="label-text text-white/80">Children</span>
+              <input name="children"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.children || '' %>">
             </label>
             <label class="form-control">
-              <span class="label-text">Wants more children</span>
-              <input name="wantsMoreChildren" class="input input-bordered" value="<%- currentUser?.profile?.wantsMoreChildren || '' %>">
+              <span class="label-text text-white/80">Wants more children</span>
+              <input name="wantsMoreChildren"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                     value="<%- currentUser?.profile?.wantsMoreChildren || '' %>">
             </label>
           </div>
         </section>
 
         <!-- Interests -->
-        <section class="card bg-base-100 shadow">
-          <div class="card-body">
-            <h2 class="card-title">Interests</h2>
-            <label class="form-control">
-              <span class="label-text">Interests (comma separated)</span>
-              <input name="interests" class="input input-bordered"
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+          <div class="p-5 md:p-6">
+            <h2 class="text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Interests
+            </h2>
+
+            <label class="form-control mt-3">
+              <span class="label-text text-white/80">Interests (comma separated)</span>
+              <input name="interests"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
                      value="<%- (currentUser?.profile?.interests || []).join(', ') %>">
             </label>
 
             <label class="form-control mt-3">
-              <span class="label-text">Hobbies & Interests (comma separated)</span>
-              <input name="hobbiesInterests" class="input input-bordered"
+              <span class="label-text text-white/80">Hobbies & Interests (comma separated)</span>
+              <input name="hobbiesInterests"
+                     class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
                      value="<%- (currentUser?.profile?.hobbiesInterests || []).join(', ') %>">
             </label>
           </div>
         </section>
 
         <!-- Personality (single-select/short-texts) -->
-        <section class="card bg-base-100 shadow">
-          <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
-            <h2 class="card-title md:col-span-2">Personality</h2>
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+          <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <h2 class="md:col-span-2 text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Personality
+            </h2>
             <% const P = currentUser?.profile || {}; %>
             <% const rows = [
               ['earlyBirdNightOwl', 'Early bird / Night owl'],
@@ -199,39 +264,53 @@
 
             <% rows.forEach(([name, label]) => { %>
               <label class="form-control">
-                <span class="label-text"><%= label %></span>
-                <input name="<%= name %>" class="input input-bordered" value="<%- P?.[name] || '' %>">
+                <span class="label-text text-white/80"><%= label %></span>
+                <input name="<%= name %>"
+                       class="input input-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"
+                       value="<%- P?.[name] || '' %>">
               </label>
             <% }) %>
           </div>
         </section>
 
         <!-- Prompts (top-level) -->
-        <section class="card bg-base-100 shadow">
-          <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-4">
-            <h2 class="card-title md:col-span-3">Prompts</h2>
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow">
+          <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <h2 class="md:col-span-3 text-lg md:text-xl font-semibold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Prompts
+            </h2>
 
             <label class="form-control">
-              <span class="label-text">Favorite African Artists</span>
-              <textarea name="favoriteAfricanArtists" rows="3" class="textarea textarea-bordered"><%- currentUser?.favoriteAfricanArtists || '' %></textarea>
+              <span class="label-text text-white/80">Favorite African Artists</span>
+              <textarea name="favoriteAfricanArtists" rows="3"
+                        class="textarea textarea-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"><%- currentUser?.favoriteAfricanArtists || '' %></textarea>
             </label>
 
             <label class="form-control">
-              <span class="label-text">Cultural Traditions</span>
-              <textarea name="culturalTraditions" rows="3" class="textarea textarea-bordered"><%- currentUser?.culturalTraditions || '' %></textarea>
+              <span class="label-text text-white/80">Cultural Traditions</span>
+              <textarea name="culturalTraditions" rows="3"
+                        class="textarea textarea-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"><%- currentUser?.culturalTraditions || '' %></textarea>
             </label>
 
             <label class="form-control md:col-span-1">
-              <span class="label-text">Relationship Goals</span>
-              <textarea name="relationshipGoals" rows="3" class="textarea textarea-bordered"><%- currentUser?.relationshipGoals || '' %></textarea>
+              <span class="label-text text-white/80">Relationship Goals</span>
+              <textarea name="relationshipGoals" rows="3"
+                        class="textarea textarea-bordered bg-white/5 border-white/15 text-black placeholder-white/50 focus:border-[#FECA57] focus:outline-none"><%- currentUser?.relationshipGoals || '' %></textarea>
             </label>
           </div>
         </section>
 
         <!-- Actions -->
         <div class="flex items-center gap-2 justify-end">
-          <a href="/my-profile" class="btn btn-ghost">Cancel</a>
-          <button class="btn btn-primary">Save changes</button>
+          <a href="/my-profile"
+             class="btn btn-ghost rounded-full text-white/80 hover:bg-white/10">
+            Cancel
+          </a>
+          <button class="btn rounded-full text-black border-0
+                         bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]
+                         hover:shadow-xl hover:scale-[1.02] transition">
+            Save changes
+          </button>
         </div>
       </form>
     </main>

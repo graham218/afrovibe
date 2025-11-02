@@ -4,23 +4,29 @@
   <%- include('partials/head.ejs', { pageTitle: 'Chat' }) %>
 </head>
 
-<body class="bg-base-100 min-h-screen flex flex-col"
-      data-peer-id="<%= (peer && peer._id) ? String(peer._id) : (otherUser && otherUser._id) ? String(otherUser._id) : '' %>">
+<body
+  class="min-h-screen flex flex-col bg-black text-white selection:bg-[#FECA57]/20 selection:text-white">
 
+  <!-- Navbar (unchanged include) -->
   <%- include('partials/navbar.ejs', { currentUser, unreadMessages, unreadNotificationCount }) %>
 
   <!-- Hidden IDs for JS (force clean 24-hex strings) -->
   <input type="hidden" id="currentUserId"
          value="<%= (currentUser && currentUser._id) ? String(currentUser._id) : '' %>">
-
   <input type="hidden" id="otherUserId"
          value="<%= (peer && peer._id) ? String(peer._id)
                 : (otherUser && otherUser._id) ? String(otherUser._id)
                 : '' %>">
 
-  <main class="flex-1 max-w-4xl mx-auto p-4 w-full">
-    <!-- Header -->
-    <div class="card bg-base-100 border shadow mb-3">
+  <!-- Page container with a subtle radial depth overlay (inside main so it never covers navbar/footer) -->
+  <main class="relative isolation-isolate flex-1 max-w-4xl mx-auto w-full px-4 md:px-6 lg:px-8 py-6">
+    <div aria-hidden="true"
+         class="pointer-events-none absolute inset-0 -z-10
+                bg-[radial-gradient(60%_50%_at_30%_0%,rgba(255,107,107,.10),transparent_65%),radial-gradient(55%_45%_at_90%_100%,rgba(254,202,87,.10),transparent_65%)]">
+    </div>
+
+    <!-- Header (glass card) -->
+    <div class="card bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow mb-4">
       <div class="flex items-center justify-between px-4 py-3">
         <div class="flex items-center gap-3">
           <%
@@ -28,155 +34,181 @@
             const avatarSrc = p0 ? (p0.startsWith('/') ? p0 : '/' + p0) : '/images/default-avatar.png';
           %>
 
-          <!-- Fixed-size circular avatar wrapper -->
-          <div class="rounded-full overflow-hidden ring ring-base-300 ring-offset-2"
+          <!-- Avatar w/ hover zoom -->
+          <div class="rounded-full overflow-hidden ring-1 ring-white/10 ring-offset-2 ring-offset-black/40"
                style="width:48px;height:48px">
             <img src="<%= avatarSrc %>"
                  alt="avatar"
-                 class="w-full h-full object-cover select-none"
+                 class="w-full h-full object-cover select-none transition-transform duration-300 will-change-transform hover:scale-105"
                  draggable="false">
           </div>
 
           <div>
-            <div class="font-semibold text-base leading-tight">
+            <div class="font-semibold text-base leading-tight flex items-center gap-2">
               <%= (peer && peer.username) ? peer.username : (otherUser && otherUser.username) || 'User' %>
+              <!-- online dot (optional visual hint) -->
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
             </div>
-            <div id="typingDot" class="text-xs opacity-60 leading-tight">&nbsp;</div>
+            <div id="typingDot" class="text-xs text-white/60 leading-tight">&nbsp;</div>
           </div>
         </div>
 
         <div class="flex items-center gap-2">
-  <button class="btn btn-sm btn-ghost video-call-btn"
-          data-peer-id="<%= String((peer && peer._id) || (otherUser && otherUser._id) || '') %>">
-    📹 Video chat
-  </button>
+          <!-- Video call -->
+          <button class="btn btn-sm rounded-full text-black border-0
+                         bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl video-call-btn"
+            data-peer-id="<%= String((peer && peer._id) || (otherUser && otherUser._id) || '') %>">
+            📹 Video chat
+          </button>
 
-  <!-- New: End call (hidden until in-call) -->
-  <button type="button"
-          class="btn btn-sm btn-outline hidden video-end-btn">
-    ⛔ End
-  </button>
+          <!-- End call (hidden until in-call) -->
+          <button type="button"
+                  class="btn btn-sm btn-outline rounded-full border-white/20 text-white/90 hidden video-end-btn">
+            ⛔ End
+          </button>
 
-  <!-- Clear chat (fix keeps as-is; wired by JS) -->
-  <button id="clearThreadBtn"
-        class="btn btn-sm btn-outline"
-        data-other-id="<%= String(otherUser?._id || peer?._id || '') %>">
-  🗑 Clear
-</button>
-
-</div>
-
+          <!-- Clear chat (wired by JS) -->
+          <button id="clearThreadBtn"
+                  class="btn btn-sm btn-outline rounded-full border-white/20 text-white/90 hover:bg-white/10"
+                  data-other-id="<%= String(otherUser?._id || peer?._id || '') %>">
+            🗑 Clear
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Messages list -->
+    <!-- Messages list (glass card) -->
     <%
       const _msgs = (typeof messages !== 'undefined' && messages)
                  || (typeof initialHistory !== 'undefined' && initialHistory)
                  || [];
     %>
-    <div id="chatScroll" class="card bg-base-100 border shadow p-3 space-y-2 max-h-[70vh] md:max-h-[72vh] overflow-y-auto">
+    <div id="chatScroll"
+         class="card bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] p-3 space-y-2 max-h-[70vh] md:max-h-[72vh] overflow-y-auto">
 
-  <% 
-    // Use a single list from the server
-    const list = (Array.isArray(initialHistory) && initialHistory.length)
-      ? initialHistory
-      : (Array.isArray(messages) ? messages : []);
-  %>
+      <% 
+        // Use a single list from the server
+        const list = (Array.isArray(initialHistory) && initialHistory.length)
+          ? initialHistory
+          : (Array.isArray(messages) ? messages : []);
+      %>
 
-  <% list.forEach(function(m){ 
-       const mine   = String(m.sender) === String(currentUser._id);
-       const date   = m.createdAt ? new Date(m.createdAt) : new Date();
-       const iso    = date.toISOString();
-       const pretty = date.toLocaleString(); // fallback display
-  %>
-    <div class="flex <%= mine ? 'justify-end' : 'justify-start' %>">
-      <div class="max-w-[85%] md:max-w-[75%] rounded-2xl px-3 py-2 <%= mine ? 'bg-primary text-white' : 'bg-gray-100' %>"
-           data-id="<%= m._id %>"
-           data-mine="<%= mine ? '1' : '0' %>">
-        <div class="whitespace-pre-wrap break-words text-sm"><%= m.content %></div>
-        <div class="text-[10px] opacity-70 mt-1">
-          <span class="msg-time" data-ts="<%= iso %>"><%= pretty %></span>
-          <% if (mine) { %><span class="delivery ml-1">✓</span><% } %>
+      <% list.forEach(function(m){ 
+           const mine   = String(m.sender) === String(currentUser._id);
+           const date   = m.createdAt ? new Date(m.createdAt) : new Date();
+           const iso    = date.toISOString();
+           const pretty = date.toLocaleString(); // fallback display
+      %>
+        <div class="flex <%= mine ? 'justify-end' : 'justify-start' %>">
+          <div
+            class="max-w-[85%] md:max-w-[75%] rounded-2xl px-3 py-2
+                   <%= mine
+                        ? 'bg-gradient-to-r from-[#FECA57]/90 to-[#FF6B6B]/90 text-black'
+                        : 'bg-white/10 text-white border border-white/10 backdrop-blur-lg' %>
+                   shadow-sm">
+            <div class="whitespace-pre-wrap break-words text-sm"><%= m.content %></div>
+            <div class="text-[10px] <%= mine ? 'text-black/70' : 'text-white/70' %> mt-1">
+              <span class="msg-time" data-ts="<%= iso %>"><%= pretty %></span>
+              <% if (mine) { %><span class="delivery ml-1">✓</span><% } %>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  <% }); %>
-</div>
+      <% }); %>
 
+      <% if (!list.length) { %>
+        <div class="py-12 text-center">
+          <div class="inline-block px-6 py-5 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10">
+            <div class="text-sm text-white/70">No messages yet</div>
+            <div class="text-2xl font-extrabold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+              Say hello 👋
+            </div>
+          </div>
+        </div>
+      <% } %>
+    </div>
 
     <!-- Composer -->
     <% if (typeof isMatched === 'undefined' || isMatched) { %>
       <form id="chatForm" class="sticky bottom-0 mt-3 flex gap-2" action="/api/messages" method="post">
-        <input id="chatInput" name="content" class="input input-bordered flex-1" placeholder="Type a message…">
-        <button class="btn btn-primary">Send</button>
+        <input id="chatInput"
+               name="content"
+               class="input input-bordered flex-1 bg-black/50 border-white/20 text-black placeholder:text-black/40 focus:border-white/30"
+               placeholder="Type a message…">
+        <button class="btn rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">
+          Send
+        </button>
       </form>
     <% } else { %>
-      <div class="alert mt-3">
+      <div class="alert mt-3 bg-black/60 backdrop-blur-xl border border-white/10 text-white">
         <div>
           <span class="font-medium">You can’t message yet.</span>
-          <span class="opacity-70 text-sm">Send a like or wait for a match to unlock messaging.</span>
+          <span class="text-white/70 text-sm">Send a like or wait for a match to unlock messaging.</span>
         </div>
-        <a class="btn btn-sm btn-primary ml-auto" href="/upgrade?reason=chat">Upgrade</a>
+        <a class="btn btn-sm rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl ml-auto"
+           href="/upgrade?reason=chat">Upgrade</a>
       </div>
     <% } %>
 
     <!-- Safety actions -->
     <div class="mt-2 flex gap-2">
-      <button id="blockUser"  class="btn btn-outline btn-xs">Block</button>
-      <button id="reportUser" class="btn btn-outline btn-xs">Report</button>
+      <button id="blockUser"
+              class="btn btn-outline btn-xs rounded-full border-white/20 text-white/90 hover:bg-white/10">
+        Block
+      </button>
+      <button id="reportUser"
+              class="btn btn-outline btn-xs rounded-full border-white/20 text-white/90 hover:bg-white/10">
+        Report
+      </button>
     </div>
   </main>
 
-  <!-- RTC modal -->
-  <!-- RTC modal (keep this near end of <body>) -->
-<dialog id="rtc-modal" class="modal z-[9999]">
-  <div class="modal-box p-0 max-w-4xl">
-    <div class="flex items-center justify-between px-4 py-3 border-b bg-base-100">
-      <div class="flex items-center gap-2">
-        <span class="font-semibold">Video chat</span>
-        <span id="rtc-status" class="text-xs opacity-70">Connecting…</span>
+  <!-- RTC modal (glass) -->
+  <dialog id="rtc-modal" class="modal z-[9999]">
+    <div class="modal-box p-0 max-w-4xl bg-black/80 backdrop-blur-2xl border border-white/10 rounded-3xl text-white overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-white/10">
+        <div class="flex items-center gap-2">
+          <span class="font-semibold">Video chat</span>
+          <span id="rtc-status" class="text-xs text-white/70">Connecting…</span>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-outline btn-xs rounded-full border-white/20 text-black/90 rtc-mute"  type="button">Mute</button>
+          <button class="btn btn-outline btn-xs rounded-full border-white/20 text-black/90 rtc-video" type="button">Video</button>
+          <button class="btn btn-xs rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl rtc-hangup" type="button">End</button>
+        </div>
       </div>
-      <div class="flex gap-2">
-        <button class="btn btn-outline btn-xs rtc-mute"  type="button">Mute</button>
-        <button class="btn btn-outline btn-xs rtc-video" type="button">Video</button>
-        <button class="btn btn-error   btn-xs rtc-hangup" type="button">End</button>
+
+      <div class="grid md:grid-cols-[1fr_auto] gap-2 p-3 bg-black/50">
+        <video id="rtc-remote" playsinline autoplay class="w-full aspect-video rounded bg-black border border-white/10"></video>
+        <video id="rtc-local"  playsinline autoplay muted class="w-40 h-28 md:w-48 md:h-36 rounded bg-black border border-white/10 self-end shadow"></video>
       </div>
-    </div>
 
-    <div class="grid md:grid-cols-[1fr_auto] gap-2 p-3 bg-base-200">
-      <video id="rtc-remote" playsinline autoplay class="w-full aspect-video rounded bg-black"></video>
-      <video id="rtc-local"  playsinline autoplay muted class="w-40 h-28 md:w-48 md:h-36 rounded bg-black self-end shadow"></video>
-    </div>
-
-    <div id="rtc-incoming" class="p-4 hidden">
-      <div class="card bg-base-100 border">
-        <div class="card-body p-4 flex items-center justify-between">
-          <div>
-            <div class="font-semibold">Incoming call</div>
-            <div class="text-xs opacity-70" id="rtc-from-label"></div>
-          </div>
-          <div class="flex gap-2">
-            <button class="btn btn-success btn-sm rtc-accept" type="button">Accept</button>
-            <button class="btn btn-ghost   btn-sm rtc-decline" type="button">Decline</button>
+      <div id="rtc-incoming" class="p-4 hidden">
+        <div class="card bg-black/60 backdrop-blur-xl border border-white/10">
+          <div class="card-body p-4 flex items-center justify-between">
+            <div>
+              <div class="font-semibold">Incoming call</div>
+              <div class="text-xs text-white/70" id="rtc-from-label"></div>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-success btn-sm rounded-full" type="button">Accept</button>
+              <button class="btn btn-ghost btn-sm rounded-full text-white/80 hover:bg-white/10" type="button">Decline</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- backdrop (DaisyUI) -->
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
+    <!-- backdrop (DaisyUI) -->
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
 
+  <!-- Scripts (defer; no inline handlers so CSP is fine) -->
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="/js/socket.helper.js" defer></script>
+  <script src="/js/global.js" defer></script>
+  <script src="/js/page-chat.js" defer></script>
 
-<!-- load from the same origin the page was served from -->
- <script src="/socket.io/socket.io.js" defer></script>
-<script src="/js/socket.helper.js" defer></script>
-<script src="/js/global.js" defer></script>
-<script src="/js/page-chat.js" defer></script>
-
-
+  <!-- Footer (unchanged include) -->
   <%- include('partials/footer.ejs') %>
 </body>
 </html>

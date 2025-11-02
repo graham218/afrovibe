@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="afrovibe">
+  <%- include('partials/head', { pageTitle: pageTitle || 'How It Works' }) %>
+<body class="bg-black text-white min-h-screen flex flex-col">
+  <%- include('partials/navbar') %>
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+    <header class="mb-4">
+      <h1 class="text-3xl font-bold bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">How It Works</h1>
+      <p class="text-white/70 mt-2">Create a profile, set your preferences, and start discovering genuine connections.</p>
+    </header>
+
+    <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 p-6">
+      <ol class="space-y-4 list-decimal list-inside text-white/90">
+        <li>Build your profile — add photos, write a short bio, share your interests.</li>
+        <li>Discover — use filters or the feed to find people who match your vibe.</li>
+        <li>Connect — like, super-like, or send a message when it’s a match.</li>
+      </ol>
+    </section>
+  </main>
+  <%- include('partials/footer') %>
+</body>
+</html>

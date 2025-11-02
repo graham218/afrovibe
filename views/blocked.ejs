@@ -14,99 +14,155 @@
   <%- include('partials/head.ejs', {
         pageTitle: (typeof pageTitle !== 'undefined' && pageTitle) ? pageTitle : 'Blocked users'
       }) %>
-  <body class="bg-base-100 min-h-screen flex flex-col">
+  <body class="min-h-screen flex flex-col bg-black text-white selection:bg-rose-500/30">
+
+    <!-- Navbar (unchanged include) -->
     <%- include('partials/navbar.ejs') %>
 
-    <main class="max-w-6xl mx-auto w-full p-4 md:p-6 flex-1">
-      <!-- Header -->
-      <header class="mb-5">
-        <h1 class="text-2xl font-bold">Safety · Blocked users</h1>
-        <p class="text-sm opacity-70">You won’t see or interact with people you’ve blocked.</p>
-      </header>
+    <!-- Page background accents (only behind main) -->
+    <main class="relative isolation-isolate flex-1 w-full">
+      <div aria-hidden="true"
+           class="pointer-events-none absolute inset-0 -z-10
+                  bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.10),transparent_60%),radial-gradient(60%_40%_at_80%_100%,rgba(254,202,87,.10),transparent_60%)]">
+      </div>
 
-      <!-- Confirm block (compact) -->
-      <% if (targetUser) {
-           const raw = targetUser?.profile?.photos?.[0];
-           const avatar = raw ? (raw.startsWith('/') ? raw : ('/' + raw)) : '/images/default-avatar.png';
-      %>
-        <section class="card bg-base-100 border shadow mb-6">
-          <div class="card-body">
-            <h2 class="card-title">Confirm block</h2>
+      <div class="max-w-6xl mx-auto w-full p-4 md:p-6">
 
-            <div class="flex items-start gap-3">
-              <div class="w-12 h-12 rounded-full overflow-hidden ring ring-base-300 ring-offset-2 shrink-0">
-                <img src="<%= avatar %>" class="w-full h-full object-cover" alt="<%= targetUser.username %> avatar" data-fallback="/images/default-avatar.png">
+        <!-- Header -->
+        <header class="mb-6">
+          <h1 class="text-2xl md:text-3xl font-bold tracking-tight">
+            <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">Safety</span>
+            <span class="opacity-90"> · Blocked users</span>
+          </h1>
+          <p class="text-sm opacity-80">You won’t see or interact with people you’ve blocked.</p>
+        </header>
+
+        <!-- Confirm block (glass, compact) -->
+        <% if (targetUser) {
+             const raw = targetUser?.profile?.photos?.[0];
+             const avatar = raw ? (raw.startsWith('/') ? raw : ('/' + raw)) : '/images/default-avatar.png';
+        %>
+          <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)] hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-shadow mb-6">
+            <div class="p-4 md:p-6">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg md:text-xl font-semibold">Confirm block</h2>
+                <span class="i-lucide-shield text-rose-300/80"></span>
               </div>
 
-              <div class="min-w-0">
-                <div class="font-semibold leading-tight truncate"><%= targetUser.username %></div>
-                <div class="text-xs opacity-70 leading-tight">
-                  <%= [targetUser?.profile?.city, targetUser?.profile?.country].filter(Boolean).join(', ') || '—' %>
+              <div class="flex items-start gap-3">
+                <div class="w-12 h-12 rounded-full overflow-hidden ring-2 ring-white/15 ring-offset-2 ring-offset-black/20 shrink-0">
+                  <img src="<%= avatar %>" class="w-full h-full object-cover" alt="<%= targetUser.username %> avatar" data-fallback="/images/default-avatar.png">
                 </div>
-                <p class="text-sm mt-2 opacity-80">
-                  Blocking removes likes/matches in both directions and hides you from each other.
-                </p>
 
-                <form action="/block/<%= String(targetUser._id) %>" method="POST" class="mt-3 flex items-center gap-2">
-                  <label class="form-control w-full md:max-w-sm">
-                    <span class="label-text text-xs">Reason (optional)</span>
-                    <textarea name="reason" rows="2" class="textarea textarea-bordered textarea-sm" placeholder="Spam, fake profile, harassment…"></textarea>
-                  </label>
-
-                  <div class="shrink-0 flex items-center gap-2">
-                    <button type="submit" class="btn btn-error btn-sm">Block</button>
-                    <a href="/users/<%= String(targetUser._id) %>" class="btn btn-ghost btn-sm">Cancel</a>
+                <div class="min-w-0">
+                  <div class="font-semibold leading-tight truncate"><%= targetUser.username %></div>
+                  <div class="text-xs opacity-75 leading-tight">
+                    <%= [targetUser?.profile?.city, targetUser?.profile?.country].filter(Boolean).join(', ') || '—' %>
                   </div>
-                </form>
+                  <p class="text-sm mt-2 opacity-90">
+                    Blocking removes likes/matches in both directions and hides you from each other.
+                  </p>
+
+                  <form action="/block/<%= String(targetUser._id) %>" method="POST" class="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <label class="form-control w-full sm:max-w-sm">
+                      <span class="label-text text-xs opacity-80">Reason (optional)</span>
+                      <textarea name="reason" rows="2"
+                                class="textarea textarea-bordered textarea-sm bg-black/40 border-white/20 text-white placeholder-white/40"
+                                placeholder="Spam, fake profile, harassment…"></textarea>
+                    </label>
+
+                    <div class="shrink-0 flex items-center gap-2">
+                      <button type="submit"
+                              class="btn btn-sm rounded-full text-black border-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl hover:scale-[1.02] transition">
+                        Block
+                      </button>
+                      <a href="/users/<%= String(targetUser._id) %>"
+                         class="btn btn-ghost btn-sm rounded-full border-white/20 text-white/90 hover:bg-white/10">
+                        Cancel
+                      </a>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
-      <% } %>
+          </section>
+        <% } %>
 
-      <!-- Blocked list (GRID CARDS, small avatar) -->
-      <section class="card bg-base-100 border shadow">
-        <div class="card-body">
-          <div class="flex items-center justify-between">
-            <h2 class="card-title">Blocked users</h2>
+        <!-- Blocked list (GRID CARDS, small avatar) -->
+        <section class="rounded-3xl bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_12px_40px_-12px_rgba(0,0,0,.6)]">
+          <div class="p-4 md:p-6">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg md:text-xl font-semibold">Blocked users</h2>
+              <% if (Array.isArray(blockedUsers) && blockedUsers.length) { %>
+                <span class="badge badge-md bg-black/40 border border-white/15 text-white/90">
+                  <%= blockedUsers.length %>
+                </span>
+              <% } %>
+            </div>
+
             <% if (Array.isArray(blockedUsers) && blockedUsers.length) { %>
-              <span class="badge badge-ghost"><%= blockedUsers.length %></span>
-            <% } %>
-          </div>
-
-          <% if (Array.isArray(blockedUsers) && blockedUsers.length) { %>
-            <div class="mt-3 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              <% blockedUsers.forEach(function(u) {
-                   const raw = u?.profile?.photos?.[0];
-                   const ava = raw ? (raw.startsWith('/') ? raw : ('/' + raw)) : '/images/default-avatar.png';
-              %>
-                <article class="border border-base-300 rounded-2xl p-3 bg-base-100 hover:shadow-sm transition-shadow">
-                  <div class="flex items-start gap-3">
-                    <div class="w-10 h-10 rounded-full overflow-hidden ring ring-base-300 ring-offset-2 shrink-0">
-                      <img src="<%= ava %>" class="w-full h-full object-cover" alt="<%= u.username %> avatar" data-fallback="/images/default-avatar.png">
-                    </div>
-
-                    <div class="min-w-0 flex-1">
-                      <div class="font-medium leading-tight truncate"><%= u.username %></div>
-                      <div class="text-xs opacity-70 truncate">
-                        <%= [u?.profile?.city, u?.profile?.country].filter(Boolean).join(', ') || '—' %>
+              <div class="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                <% blockedUsers.forEach(function(u) {
+                     const raw = u?.profile?.photos?.[0];
+                     const ava = raw ? (raw.startsWith('/') ? raw : ('/' + raw)) : '/images/default-avatar.png';
+                %>
+                  <article
+                    class="rounded-2xl p-3 bg-black/60 backdrop-blur-lg border border-white/10 hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,.75)] transition-all hover:scale-[1.01]">
+                    <div class="flex items-start gap-3">
+                      <div class="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/15 ring-offset-2 ring-offset-black/20 shrink-0">
+                        <img src="<%= ava %>" class="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+                             alt="<%= u.username %> avatar" data-fallback="/images/default-avatar.png">
                       </div>
 
-                      <form action="/unblock/<%= String(u._id) %>" method="POST" class="mt-3">
-                        <button type="submit" class="btn btn-outline btn-xs">Unblock</button>
-                      </form>
+                      <div class="min-w-0 flex-1">
+                        <div class="font-medium leading-tight truncate">
+                          <span class="bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] bg-clip-text text-transparent">
+                            <%= u.username %>
+                          </span>
+                        </div>
+                        <div class="text-xs opacity-75 truncate">
+                          <%= [u?.profile?.city, u?.profile?.country].filter(Boolean).join(', ') || '—' %>
+                        </div>
+
+                        <form action="/unblock/<%= String(u._id) %>" method="POST" class="mt-3">
+                          <button type="submit"
+                                  class="btn btn-xs rounded-full text-black border-0 bg-gradient-to-r from-[#FECA57] to-[#FF6B6B] hover:shadow-xl hover:scale-105 transition">
+                            Unblock
+                          </button>
+                        </form>
+                      </div>
                     </div>
-                  </div>
-                </article>
-              <% }) %>
-            </div>
-          <% } else { %>
-            <div class="text-sm opacity-70">You haven’t blocked anyone yet.</div>
-          <% } %>
-        </div>
-      </section>
+                  </article>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <!-- Empty state -->
+              <div class="mt-4 rounded-2xl p-6 text-center bg-black/50 backdrop-blur-lg border border-white/10">
+                <div class="mx-auto w-12 h-12 rounded-full grid place-items-center bg-white/5 border border-white/10">
+                  <svg viewBox="0 0 24 24" class="w-6 h-6 text-white/70" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 2c2.8 0 5 2.2 5 5s-2.2 5-5 5s-5-2.2-5-5s2.2-5 5-5Zm0 11c4.4 0 8 2.2 8 5v2H4v-2c0-2.8 3.6-5 8-5Z"/>
+                  </svg>
+                </div>
+                <p class="mt-3 text-sm opacity-85">You haven’t blocked anyone yet.</p>
+              </div>
+            <% } %>
+          </div>
+        </section>
+
+      </div>
     </main>
 
+    <!-- Footer (unchanged include) -->
     <%- include('partials/footer.ejs') %>
+
+    <!-- Reduce-motion guard for large hovers -->
+    <style>
+      @media (prefers-reduced-motion: reduce) {
+        .hover\:scale-\[1\.01\]:hover,
+        .hover\:scale-105:hover,
+        .hover\:scale-\[1\.02\]:hover { transform: none !important; }
+        .transition, .transition-all, .transition-transform { transition: none !important; }
+      }
+    </style>
   </body>
 </html>

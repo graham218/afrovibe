@@ -2,15 +2,18 @@
 <html lang="en" data-theme="afrovibe">
   <%- include('partials/head.ejs', { pageTitle: 'Dashboard' }) %>
 
-  <body class="min-h-screen flex flex-col bg-black text-white relative">
+  <body class="min-h-screen flex flex-col bg-black text-black relative">
     <!-- Subtle page gradient overlay -->
     <div aria-hidden="true"
-         class="pointer-events-none fixed inset-0 bg-[radial-gradient(90%_70%_at_50%_20%,rgba(255,107,107,0.10),transparent_60%),linear-gradient(to_bottom,#0a0a0a,rgba(17,17,17,0.94))]"></div>
+         class="pointer-events-none absolute inset-0 -z-10
+              bg-[radial-gradient(60%_50%_at_50%_0%,rgba(255,107,107,.14),transparent_60%),radial-gradient(60%_40%_at_80%_100%,rgba(254,202,87,.12),transparent_60%)]">
+  </div>
 
     <!-- Navbar (unchanged include) -->
     <%- include('partials/navbar.ejs') %>
 
-    <main class="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow">
+    <main class="relative isolation-isolate z-10 max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 text-white">
+
 
       <!-- Top strip: likes / boost / plan -->
       <section class="mb-6">
@@ -119,15 +122,26 @@
 
 
                 <!-- Favorite star -->
-                <button
-                  class="btn btn-ghost btn-xs absolute top-2 right-2 rounded-full shadow-sm favorite-toggle <%= u.isFavorite ? 'text-yellow-400' : 'text-white' %> bg-black/50 backdrop-blur border border-white/10"
-                  data-user-id="<%= u._id %>"
-                  data-id="<%= u._id %>"
-                  aria-pressed="<%= u.isFavorite ? 'true' : 'false' %>"
-                  title="<%= u.isFavorite ? 'Unfavorite' : 'Favorite' %>">
-                  <span aria-hidden="true">★</span>
-                  <span class="sr-only"><%= u.isFavorite ? 'Unfavorite' : 'Favorite' %></span>
-                </button>
+<button
+  class="favorite-toggle btn btn-ghost btn-sm absolute top-2 right-2 rounded-full
+         shadow-md ring-1 ring-white/10 bg-black/50 backdrop-blur
+         hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-primary/40"
+  data-user-id="<%= u._id %>"
+  data-id="<%= u._id %>"
+  aria-pressed="<%= u.isFavorite ? 'true' : 'false' %>"
+  title="<%= u.isFavorite ? 'Unfavorite' : 'Favorite' %>">
+
+  <span
+    aria-hidden="true"
+    class="fav-icon text-2xl leading-none transition-transform duration-200
+           <%= u.isFavorite
+                ? 'text-transparent bg-clip-text bg-gradient-to-r from-[#FF6B6B] to-[#FECA57]'
+                : 'text-white/90' %>">
+    ★
+  </span>
+
+  <span class="sr-only"><%= u.isFavorite ? 'Unfavorite' : 'Favorite' %></span>
+</button>
 
                    <!-- Tier badge -->
 <% if (u.memberLevel) { %>
