@@ -23,6 +23,7 @@ app.set('io', io);
 app.use((req, _res, next) => { req.io = io; next(); });
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
+const clean = s => String(s || '').trim().slice(0, 5000);
 
 // ---- Stripe ----
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -1431,76 +1432,66 @@ staticPages.forEach(({ path, view, title }) => {
   });
 });
 
+// server.js (or routes file)
 
-// Contact: POST (handles form submit)
-app.post('/contact', express.urlencoded({ extended: true }), async (req, res) => {
-  try {
-    const { name = '', email = '', message = '' } = req.body;
-    // TODO: send email or store in DB
-    console.log('[CONTACT]', { name, email, message, userId: req.session?.userId || null });
-    // Redirect with flag to avoid resubmits
-    return res.redirect('/contact?sent=1');
-  } catch (e) {
-    console.error('contact err', e);
-    return res.status(500).render('error', { status: 500, message: 'Could not send your message.' });
-  }
+// GET /report
+app.get('/report', checkAuth, (req, res) => {
+  const sent = req.query.sent === '1';
+  res.render('report', {
+    pageTitle: 'Report a Concern',
+    sent,                   // ✅ give EJS a simple boolean
+  });
 });
 
-// Helper: allow pages to render even if not logged in
-function checkAuthOptional(req, _res, next) {
-  // If you already set req.user in another middleware, keep using that.
-  // Otherwise mildly hydrate from session:
-  req.user = req.user || (req.session?.userId ? { _id: req.session.userId } : null);
-  next();
-}
-
-app.post('/report', async (req, res) => {
+// POST /report
+app.post('/report', checkAuth, async (req, res) => {
   try {
-    const { subject = '', details = '' } = req.body || {};
-    // TODO: persist to DB or notify moderators
-    console.log('REPORT', { subject, details, userId: req.session?.userId });
+    // If you already created Ticket, use it; otherwise this will no-op.
+    // Minimal example:
+    // await Ticket.create({
+    //   type: 'report',
+    //   user: req.session.userId,
+    //   subject: String(req.body.subject || '').slice(0, 200),
+    //   details: String(req.body.details || '').slice(0, 5000),
+    // });
+
+    // After saving, bounce back with a success flag
     res.redirect('/report?sent=1');
   } catch (e) {
-    console.error('report err', e);
-    res.redirect('/report?error=1');
+    console.error('report post err', e);
+    res.status(500).render('error', { status: 500, message: 'Could not submit report.' });
   }
 });
 
-// Help Center (general)
-app.get('/help', (req, res) => {
-  res.render('ticket-form', {
-    pageTitle: 'Help Center',
-    kind: 'help',
-    heading: 'Help Center',
-    sub: 'Ask a question or get assistance.',
-    currentUser: req.user,
+
+// CONTACT
+app.get('/contact', async (req, res) => {
+  // pass sent flag explicitly (fixes "sent is not defined")
+  const sent = String(req.query.sent || '') === '1';
+  return res.render('contact', {
+    pageTitle: 'Contact',
+    currentUser: req.user || null,
+    sent
   });
 });
 
-// Report a Concern
-app.get('/report', (req, res) => {
-  // you can pass ?user=<id>&username=...&url=...
-  res.render('ticket-form', {
-    pageTitle: 'Report a Concern',
-    kind: 'report',
-    heading: 'Report a Concern',
-    sub: 'Tell us what happened so we can keep AfroVibe safe.',
-    targetUser: req.query.user || '',
-    targetUsername: req.query.username || '',
-    targetUrl: req.query.url || '',
-    currentUser: req.user,
-  });
-});
-
-// server.js
-app.get('/contact', (req, res) => {
-  res.render('ticket-form', {
-    pageTitle: 'Contact Us',
-    kind: 'contact',
-    heading: 'Contact Us',
-    sub: 'Business, press, or general messages. We read everything.',
-    currentUser: req.user,
-  });
+app.post('/contact', async (req, res) => {
+  try {
+    const { name, email, message } = req.body || {};
+    await Ticket.create({
+      user: req.session?.userId || undefined,
+      name: clean(name).slice(0, 120),
+      email: clean(email).slice(0, 180),
+      details: clean(message),
+      subject: 'Contact form',
+      type: 'contact'
+    });
+    // redirect with ?sent=1 so EJS shows success
+    return res.redirect('/contact?sent=1');
+  } catch (e) {
+    console.error('contact POST error', e);
+    return res.status(500).render('error', { status: 500, message: 'Could not send your message.' });
+  }
 });
 
 

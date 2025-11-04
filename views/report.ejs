@@ -15,9 +15,10 @@
         <textarea name="details" rows="5" class="textarea textarea-bordered bg-black/40 border-white/20 text-white" required></textarea>
       </label>
       <button class="btn rounded-full text-black bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] hover:shadow-xl">Send Report</button>
-      <% if (String(req?.query?.sent||'')==='1') { %>
-        <p class="text-emerald-400 mt-2">Thanks! We’ll review shortly.</p>
-      <% } %>
+      <!-- AFTER: use the boolean we passed from the route -->
+<% if (sent) { %>
+  <p class="text-emerald-400 mt-2">Thanks! We’ll review shortly.</p>
+<% } %>
     </form>
   </main>
   <%- include('partials/footer') %>

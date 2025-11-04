@@ -1,34 +1,42 @@
 <!-- views/partials/navbar.ejs -->
-<header class="navbar bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] shadow-md px-3 md:px-4 relative z-40 isolation-isolate">
+<header class="navbar sticky top-0 bg-gradient-to-r from-[#FF6B6B] to-[#FECA57] shadow-md px-3 md:px-4 z-40 isolation-isolate"
+        role="banner" aria-label="Primary">
   <!-- Left: brand + mobile menu -->
   <div class="navbar-start">
+    <!-- Mobile hamburger -->
     <div class="dropdown">
-      <label tabindex="0" class="btn btn-ghost lg:hidden text-black" aria-label="Open menu">
+      <label tabindex="0"
+             class="btn btn-ghost lg:hidden text-black hover:scale-105 transition"
+             aria-label="Open menu">
         <!-- hamburger -->
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </label>
 
-      <!-- Mobile dropdown (forced dark glass so it’s readable on every page) -->
+      <!-- Mobile dropdown (forced dark glass: readable on every page) -->
       <ul tabindex="0"
-          class="menu menu-sm dropdown-content mt-3 z-[200] p-2 shadow rounded-10xl w-56
+          class="menu menu-sm dropdown-content mt-3 z-[200] p-2 shadow rounded-3xl w-64
                  bg-black/95 text-white border border-white/10 backdrop-blur-xl">
-        <li><a class="hover:bg-white/10" href="/dashboard">Home</a></li>
+        <li><a class="text-[18px] font-medium hover:bg-white/10" href="/dashboard">Home</a></li>
+
         <li>
-          <a class="hover:bg-white/10" href="/messages">
+          <a class="text-[18px] font-medium hover:bg-white/10" href="/messages">
             Messages
-            <span class="badge badge-error badge-sm nav-unread-messages ml-1 <%= (typeof unreadMessages !== 'undefined' && unreadMessages > 0) ? '' : 'hidden' %>">
+            <span class="badge badge-error text-[14px] font-bold nav-unread-messages ml-2
+                         <%= (typeof unreadMessages !== 'undefined' && unreadMessages > 0) ? '' : 'hidden' %>">
               <%= typeof unreadMessages !== 'undefined' && unreadMessages > 0 ? unreadMessages : '' %>
             </span>
           </a>
         </li>
-        <li><a class="hover:bg-white/10" href="/matches">Matches</a></li>
 
-        <!-- Mobile: Connections -->
+        <li><a class="text-[18px] font-medium hover:bg-white/10" href="/matches">Matches</a></li>
+
+        <!-- Connections group -->
         <li>
           <details>
-            <summary>Connections</summary>
+            <summary class="text-[18px] font-medium">Connections</summary>
             <ul class="p-2 bg-transparent">
               <li><a class="hover:bg-white/10" href="/likes-you">Likes You</a></li>
               <li><a class="hover:bg-white/10" href="/favorites">Favorites</a></li>
@@ -38,14 +46,15 @@
           </details>
         </li>
 
-        <li><a class="hover:bg-white/10" href="/advanced-search">Advanced Search</a></li>
-        <li><a class="hover:bg-white/10" href="/settings">Settings</a></li>
+        <li><a class="text-[18px] font-medium hover:bg-white/10" href="/advanced-search">Advanced Search</a></li>
+        <li><a class="text-[18px] font-medium hover:bg-white/10" href="/settings">Settings</a></li>
 
         <!-- Mobile notifications entry -->
         <li class="md:hidden">
-          <a class="hover:bg-white/10" href="/notifications">
+          <a class="text-[18px] font-medium hover:bg-white/10" href="/notifications">
             Notifications
-            <span class="badge badge-error badge-sm nav-unread-notifs ml-1 <%= (typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0) ? '' : 'hidden' %>">
+            <span class="badge badge-error text-[14px] font-bold nav-unread-notifs ml-2
+                         <%= (typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0) ? '' : 'hidden' %>">
               <%= typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0 ? unreadNotificationCount : '' %>
             </span>
           </a>
@@ -62,32 +71,45 @@
           </li>
         <% } %>
 
-        <li><a class="hover:bg-white/10" href="/logout">Logout</a></li>
+        <li><a class="text-[18px] font-medium hover:bg-white/10" href="/logout">Logout</a></li>
       </ul>
     </div>
 
-    <a href="/dashboard" class="btn btn-ghost text-xl text-black tracking-tight">🌍 AfroVibe</a>
+    <!-- Brand (override DaisyUI btn sizing) -->
+<a href="/dashboard"
+   class="btn btn-ghost normal-case whitespace-nowrap
+          !p-0 !h-auto !min-h-0 !bg-transparent hover:!bg-transparent
+          !text-4xl sm:!text-5xl lg:!text-6xl !leading-[0.95]
+          text-black tracking-tight font-extrabold
+          hover:scale-[1.03] transition">
+  🌍 AfroVibe
+</a>
+
+
   </div>
 
-  <!-- Center: desktop menu (black text works over the bright gradient bar) -->
+  <!-- Center: desktop menu (black text works over bright gradient) -->
   <div class="navbar-center hidden lg:flex">
-    <ul class="menu menu-horizontal px-1 text-[20px]">
-      <li><a href="/dashboard" class="text-black/95 hover:text-black">Home</a></li>
+    <ul class="menu menu-horizontal px-1 gap-1">
+      <li><a href="/dashboard" class="text-black text-[18px] font-semibold hover:text-black/80">Home</a></li>
+
       <li>
-        <a href="/messages" class="text-black/95 hover:text-black">
+        <a href="/messages" class="text-black text-[18px] font-semibold hover:text-black/80">
           Messages
-          <span class="badge badge-error badge-sm nav-unread-messages ml-1 <%= (typeof unreadMessages !== 'undefined' && unreadMessages > 0) ? '' : 'hidden' %>">
+          <span class="badge badge-error text-[14px] font-bold ml-2 nav-unread-messages
+                       <%= (typeof unreadMessages !== 'undefined' && unreadMessages > 0) ? '' : 'hidden' %>">
             <%= typeof unreadMessages !== 'undefined' && unreadMessages > 0 ? unreadMessages : '' %>
           </span>
         </a>
       </li>
-      <li><a href="/matches" class="text-black/95 hover:text-black">Matches</a></li>
 
-      <!-- Desktop: Connections (dropdown forced dark glass for readability) -->
+      <li><a href="/matches" class="text-black text-[18px] font-semibold hover:text-black/80">Matches</a></li>
+
+      <!-- Desktop: Connections dropdown (forced dark glass) -->
       <li class="dropdown dropdown-hover">
-        <label tabindex="0" class="text-black/95 hover:text-black">Connections</label>
+        <label tabindex="0" class="text-black text-[18px] font-semibold hover:text-black/80">Connections</label>
         <ul tabindex="0"
-            class="dropdown-content menu p-2 rounded-2xl w-52 z-[200]
+            class="dropdown-content menu p-2 rounded-3xl w-60 z-[200]
                    bg-black/95 text-white border border-white/10 backdrop-blur-xl">
           <li><a class="hover:bg-white/10" href="/likes-you">Likes You</a></li>
           <li><a class="hover:bg-white/10" href="/favorites">Favorites</a></li>
@@ -96,8 +118,8 @@
         </ul>
       </li>
 
-      <li><a href="/advanced-search" class="text-black/95 hover:text-black">Advanced Search</a></li>
-      <li><a href="/settings" class="text-black/95 hover:text-black">Settings</a></li>
+      <li><a href="/advanced-search" class="text-black text-[18px] font-semibold hover:text-black/80">Advanced Search</a></li>
+      <li><a href="/settings" class="text-black text-[18px] font-semibold hover:text-black/80">Settings</a></li>
     </ul>
   </div>
 
@@ -106,7 +128,7 @@
     <% const boostActive = currentUser && currentUser.boostExpiresAt && new Date(currentUser.boostExpiresAt) > new Date(); %>
     <% if (boostActive) { %>
       <div class="mr-1 hidden md:flex items-center">
-        <span class="badge badge-warning text-black font-semibold rounded-full">
+        <span class="badge badge-warning text-black font-bold rounded-full">
           Boosting
           <span id="boostCountdown" class="ml-1 font-mono"
                 data-expires="<%= new Date(currentUser.boostExpiresAt).toISOString() %>">--:--</span>
@@ -116,14 +138,16 @@
 
     <!-- Notifications (desktop) -->
     <div class="hidden md:flex items-center mr-1">
-      <a href="/notifications" class="btn btn-ghost btn-circle text-black" aria-label="Notifications">
+      <a href="/notifications" class="btn btn-ghost btn-circle text-black hover:scale-105 transition"
+         aria-label="Notifications">
         <div class="indicator">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none"
                viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" />
           </svg>
-          <span class="badge badge-error badge-sm indicator-item nav-unread-notifs <%= (typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0) ? '' : 'hidden' %>">
+          <span class="badge badge-error text-[12px] font-bold indicator-item nav-unread-notifs
+                       <%= (typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0) ? '' : 'hidden' %>">
             <%= typeof unreadNotificationCount !== 'undefined' && unreadNotificationCount > 0 ? unreadNotificationCount : '' %>
           </span>
         </div>
@@ -131,28 +155,35 @@
     </div>
 
     <% if (typeof likesRemaining !== 'undefined' || typeof streak !== 'undefined') { %>
-      <div class="hidden md:flex items-center gap-3 mr-1 text-black/95">
+      <div class="hidden md:flex items-center gap-3 mr-1 text-black/90">
         <% if (typeof streak !== 'undefined') { %>
           <div class="flex items-center gap-2">
-            <span class="text-[12px] opacity-90">Streak <%= streak.day %>/<%= streak.target %></span>
-            <div class="w-20 h-1 bg-white/30 rounded-full overflow-hidden">
-              <div style="width:<%= streak.percentage %>%;" class="h-1 bg-white"></div>
+            <span class="text-[12px] font-semibold">Streak <%= streak.day %>/<%= streak.target %></span>
+            <div class="w-20 h-1 bg-black/30 rounded-full overflow-hidden">
+              <div style="width:<%= streak.percentage %>%;" class="h-1 bg-black"></div>
             </div>
           </div>
         <% } %>
 
         <% if (typeof likesRemaining !== 'undefined') { %>
-          <div class="text-[12px] opacity-90">
-            Likes: <span class="font-semibold"><%= likesRemaining >= 0 ? likesRemaining : '∞' %></span>
+          <div class="text-[12px] font-semibold">
+            Likes: <span class="font-extrabold"><%= likesRemaining >= 0 ? likesRemaining : '∞' %></span>
           </div>
         <% } %>
       </div>
     <% } %>
 
+    <!-- Upgrade CTA (kept in gradient style) -->
+    <a href="/upgrade"
+       class="btn btn-sm rounded-full bg-black/10 text-black border-black/20 hover:bg-black/20 hidden md:inline-flex">
+      <span>Upgrade</span>
+      <span class="ml-1">👑</span>
+    </a>
+
     <!-- Avatar -->
     <div class="dropdown dropdown-end">
       <label tabindex="0" class="btn btn-ghost btn-circle avatar" aria-label="Open profile menu">
-        <div class="w-10 h-10 rounded-full ring-1 ring-white/50 overflow-hidden">
+        <div class="w-10 h-10 rounded-full ring-1 ring-black/40 overflow-hidden">
           <% if (currentUser?.profile?.photos?.length) { %>
             <img src="<%= currentUser.profile.photos[0] %>" alt="Profile"
                  class="w-full h-full object-cover"
@@ -165,7 +196,7 @@
 
       <!-- Avatar dropdown (forced dark glass) -->
       <ul tabindex="0"
-          class="menu menu-sm dropdown-content mt-3 z-[200] p-2 shadow rounded-2xl w-56
+          class="menu menu-sm dropdown-content mt-3 z-[200] p-2 shadow rounded-3xl w-60
                  bg-black/95 text-white border border-white/10 backdrop-blur-xl">
         <li class="font-semibold px-3 py-1"><%= currentUser?.username || 'Profile' %></li>
         <li><a class="hover:bg-white/10" href="/my-profile">My Profile</a></li>
@@ -187,19 +218,17 @@
   </div>
 </header>
 
-<!-- Sockets: load once (official client) + your helper + global nav logic -->
+<!-- Sockets: official client + your helper + global nav logic -->
 <script src="/socket.io/socket.io.js" defer></script>
 <script src="/js/socket.helper.js" defer></script>
 <script src="/js/global.js" defer></script>
 
-<!-- Inline nav counters & boost timers (kept; uses CSP nonce if provided) -->
+<!-- Inline nav counters & boost timers (kept; CSP nonce-ready) -->
 <script nonce="<%= (typeof cspNonce !== 'undefined' && cspNonce) ? cspNonce : '' %>">
 (function () {
   if (typeof io !== 'function') return;
 
-  // Reuse the socket created by /js/socket.helper.js if present; else create one.
   var socket = window.__appSocket || (window.__appSocket = io({ withCredentials:true }));
-  // Ensure this page registers the user room (idempotent)
   var myId = '<%= currentUser?._id %>' || '';
   if (myId) { try { socket.emit('register_for_notifications', myId); } catch (e) {} }
 
@@ -238,7 +267,6 @@
     setBadge(totalBadges, msgCount + notifCount);
   });
 
-  // Opportunistic bumps
   socket.on('new_message', function () {
     msgCount += 1;
     setBadge(msgBadges, msgCount);
